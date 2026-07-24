@@ -110,3 +110,15 @@ class DatabaseService:
     @staticmethod
     def get_paragraphs_by_paper(db: Session, paper_id: str) -> List[ParagraphORM]:
         return db.query(ParagraphORM).filter(ParagraphORM.paper_id == paper_id).order_by(ParagraphORM.page_number, ParagraphORM.paragraph_id).all()
+
+    @staticmethod
+    def delete_paper(db: Session, paper_id: str) -> bool:
+        """Delete a paper and all its associated paragraphs from the database."""
+        paper = db.query(PaperORM).filter(PaperORM.id == paper_id).first()
+        if not paper:
+            return False
+        # Delete associated paragraphs first
+        db.query(ParagraphORM).filter(ParagraphORM.paper_id == paper_id).delete()
+        db.delete(paper)
+        db.commit()
+        return True
