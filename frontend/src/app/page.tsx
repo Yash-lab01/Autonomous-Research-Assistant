@@ -1,48 +1,46 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import PaperCard from "@/components/PaperCard";
 import ChatInterface from "@/components/ChatInterface";
 import ComparisonTable from "@/components/ComparisonTable";
 import LiteratureDraft from "@/components/LiteratureDraft";
-import { searchArxiv, ingestPaper, getPapers, PaperSearchResult, PaperItem } from "@/lib/api";
+import { searchArxiv, ingestPaper, getPapers, deletePaper, PaperSearchResult, PaperItem } from "@/lib/api";
 
 const WORKFLOW_STEPS = [
   {
     icon: "🔍",
     title: "1. Discover Papers",
     desc: "Search arXiv for any research topic and add papers to your OS library.",
-    color: "blue",
   },
   {
     icon: "💬",
     title: "2. Ask Questions",
     desc: "Chat with your papers — get cited answers, method breakdowns, and comparisons.",
-    color: "indigo",
   },
   {
     icon: "📊",
     title: "3. Compare",
-    desc: "View a side-by-side matrix of datasets, models, metrics, and limitations.",
-    color: "purple",
+    desc: "Select papers and view a side-by-side matrix of datasets, models, and metrics.",
   },
   {
     icon: "📝",
     title: "4. Generate Review",
     desc: "Auto-generate a structured literature survey draft with references.",
-    color: "violet",
   },
 ];
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "review">("discovery");
-  const [searchQuery, setSearchQuery] = useState("GraphRAG");
+  const [searchQuery, setSearchQuery] = useState(""); // ← always blank on load
   const [searchResults, setSearchResults] = useState<PaperSearchResult[]>([]);
   const [ingestedPapers, setIngestedPapers] = useState<PaperItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [ingestingId, setIngestingId] = useState<string | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const libraryRef = useRef<HTMLDivElement>(null);
 
   const fetchIngestedPapers = async () => {
     try {
@@ -59,11 +57,6 @@ export default function Dashboard() {
     const interval = setInterval(fetchIngestedPapers, 4000);
     return () => clearInterval(interval);
   }, []);
-
-  // Auto-hide onboarding once user has at least one paper
-  useEffect(() => {
-    if (ingestedPapers.length > 0) setShowOnboarding(false);
-  }, [ingestedPapers]);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -84,11 +77,30 @@ export default function Dashboard() {
     try {
       await ingestPaper(paper);
       await fetchIngestedPapers();
+      // Auto-reveal the library section when first paper is added
+      setShowLibrary(true);
     } catch (err: any) {
       alert(`Ingestion Error: ${err.message || err}`);
     } finally {
       setIngestingId(null);
     }
+  };
+
+  const handleRemovePaper = async (paperId: string) => {
+    setRemovingId(paperId);
+    try {
+      await deletePaper(paperId);
+      await fetchIngestedPapers();
+    } catch (err: any) {
+      alert(`Remove Error: ${err.message || err}`);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleShowLibrary = () => {
+    setShowLibrary(true);
+    setTimeout(() => libraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const completedPapers = ingestedPapers.filter((p) => p.status === "done");
@@ -103,51 +115,40 @@ export default function Dashboard() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
 
-        {/* ── Onboarding Banner (only shown when library is empty) ── */}
-        {showOnboarding && activeTab === "discovery" && (
-          <div className="glass-panel rounded-2xl p-6 border border-blue-500/20 bg-blue-500/5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-base font-bold text-blue-300">👋 Welcome to AI Research OS</h2>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Your autonomous research assistant. Follow these 4 steps to get started:
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {WORKFLOW_STEPS.map((s) => (
-                    <div
-                      key={s.title}
-                      className="bg-slate-900/60 rounded-xl p-4 border border-slate-800 space-y-1.5"
-                    >
-                      <div className="text-2xl">{s.icon}</div>
-                      <p className="text-xs font-bold text-slate-200">{s.title}</p>
-                      <p className="text-xs text-slate-500 leading-relaxed">{s.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={() => setShowOnboarding(false)}
-                className="text-slate-500 hover:text-slate-300 text-lg shrink-0 mt-0.5"
-                title="Dismiss"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* ── Tab 1: Discovery ── */}
         {activeTab === "discovery" && (
           <div className="space-y-8">
+
+            {/* Welcome Banner — always shown on Discovery tab */}
+            <div className="glass-panel rounded-2xl p-6 border border-blue-500/20 bg-blue-500/5">
+              <div className="mb-4">
+                <h2 className="text-base font-bold text-blue-300">👋 Welcome to AI Research OS</h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  Your autonomous research assistant. Follow these 4 steps to get started:
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {WORKFLOW_STEPS.map((s) => (
+                  <div
+                    key={s.title}
+                    className="bg-slate-900/60 rounded-xl p-4 border border-slate-800 space-y-1.5"
+                  >
+                    <div className="text-2xl">{s.icon}</div>
+                    <p className="text-xs font-bold text-slate-200">{s.title}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">{s.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Search Box */}
             <div className="glass-panel rounded-2xl p-6">
               <div className="mb-4">
                 <h2 className="text-base font-bold text-slate-100">Search arXiv</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Search by topic, keyword, or paper title. Results come directly from arXiv.
-                  Click <span className="text-emerald-400 font-semibold">+ Add to OS</span> to download, parse, and index a paper into your library.
+                  Search by topic, keyword, or paper title. Click{" "}
+                  <span className="text-emerald-400 font-semibold">+ Add to OS</span> to download, parse,
+                  and index a paper into your library.
                 </p>
               </div>
               <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
@@ -188,34 +189,88 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Ingested Paper Library */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-base font-bold text-slate-200">Your Knowledge Base</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Papers you've added. Status updates automatically as they download and process.
-                  </p>
-                </div>
-                <span className="text-xs font-mono text-slate-500 bg-slate-900/60 px-2 py-1 rounded-lg border border-slate-800">
-                  {ingestedPapers.length} total · {completedPapers.length} ready
-                </span>
-              </div>
+            {/* Knowledge Base Indicator / Toggle */}
+            {ingestedPapers.length > 0 && (
+              <div>
+                {!showLibrary ? (
+                  /* Collapsed indicator button */
+                  <button
+                    onClick={handleShowLibrary}
+                    className="w-full glass-panel rounded-2xl p-5 flex items-center justify-between hover:border-blue-500/30 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600/30 to-indigo-600/30 border border-blue-500/20 flex items-center justify-center text-lg">
+                        📚
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-bold text-slate-200 group-hover:text-blue-300 transition-colors">
+                          Your Knowledge Base
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {ingestedPapers.length} paper{ingestedPapers.length !== 1 ? "s" : ""} total ·{" "}
+                          <span className="text-emerald-400">{completedPapers.length} ready</span>
+                          {ingestedPapers.length - completedPapers.length > 0 && (
+                            <span className="text-amber-400 ml-1">
+                              · {ingestedPapers.length - completedPapers.length} processing
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 group-hover:text-blue-300 transition-colors">
+                      <span className="text-xs font-medium">View Library</span>
+                      <span className="text-lg">↓</span>
+                    </div>
+                  </button>
+                ) : (
+                  /* Expanded library */
+                  <div ref={libraryRef} className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-base font-bold text-slate-200">Your Knowledge Base</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Status updates automatically. Click 🗑 Remove to delete a paper from the library.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono text-slate-500 bg-slate-900/60 px-2 py-1 rounded-lg border border-slate-800">
+                          {ingestedPapers.length} total · {completedPapers.length} ready
+                        </span>
+                        <button
+                          onClick={() => setShowLibrary(false)}
+                          className="text-xs text-slate-500 hover:text-slate-300 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-600 transition-colors"
+                        >
+                          ↑ Collapse
+                        </button>
+                      </div>
+                    </div>
 
-              {ingestedPapers.length === 0 ? (
-                <div className="glass-panel rounded-2xl p-10 text-center text-slate-400 space-y-3">
-                  <p className="text-4xl">📚</p>
-                  <p className="text-base font-semibold text-slate-300">Your library is empty</p>
-                  <p className="text-sm">Search arXiv above and click <span className="text-emerald-400 font-semibold">+ Add to OS</span> on any paper to start building your knowledge base.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {ingestedPapers.map((paper) => (
-                    <PaperCard key={paper.id} paper={paper} />
-                  ))}
-                </div>
-              )}
-            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {ingestedPapers.map((paper) => (
+                        <PaperCard
+                          key={paper.id}
+                          paper={paper}
+                          onRemove={handleRemovePaper}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Empty library — shown only if no papers at all */}
+            {ingestedPapers.length === 0 && searchResults.length === 0 && (
+              <div className="glass-panel rounded-2xl p-10 text-center text-slate-400 space-y-3">
+                <p className="text-4xl">📚</p>
+                <p className="text-base font-semibold text-slate-300">Your library is empty</p>
+                <p className="text-sm">
+                  Search arXiv above and click{" "}
+                  <span className="text-emerald-400 font-semibold">+ Add to OS</span> on any paper to
+                  start building your knowledge base.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -229,22 +284,19 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold text-slate-100 mb-2">Chat & Ask</h2>
                   <p className="text-slate-400 max-w-md">
                     No papers are ready yet. Go to{" "}
-                    <button
-                      onClick={() => setActiveTab("discovery")}
-                      className="text-blue-400 underline hover:text-blue-300"
-                    >
+                    <button onClick={() => setActiveTab("discovery")} className="text-blue-400 underline hover:text-blue-300">
                       Paper Discovery
                     </button>
-                    , add some papers, and wait for them to finish indexing — then come back here to ask questions.
+                    , add some papers, and wait for them to finish indexing — then come back here.
                   </p>
                 </div>
                 <div className="glass-panel rounded-2xl p-5 max-w-sm text-left space-y-3">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">What you can ask</p>
                   <div className="space-y-2 text-sm text-slate-300">
-                    <div className="flex gap-3 items-start"><span className="text-blue-400 text-lg">→</span><span>Which models perform best on HotpotQA?</span></div>
-                    <div className="flex gap-3 items-start"><span className="text-blue-400 text-lg">→</span><span>Explain the methodology of GraphRAG under Fire</span></div>
-                    <div className="flex gap-3 items-start"><span className="text-blue-400 text-lg">→</span><span>Compare these two papers</span></div>
-                    <div className="flex gap-3 items-start"><span className="text-blue-400 text-lg">→</span><span>What are the research gaps across all papers?</span></div>
+                    <div className="flex gap-3 items-start"><span className="text-blue-400">→</span><span>Which models perform best on HotpotQA?</span></div>
+                    <div className="flex gap-3 items-start"><span className="text-blue-400">→</span><span>Explain the methodology in GraphRAG under Fire</span></div>
+                    <div className="flex gap-3 items-start"><span className="text-blue-400">→</span><span>Compare these two papers side-by-side</span></div>
+                    <div className="flex gap-3 items-start"><span className="text-blue-400">→</span><span>What are the research gaps across all papers?</span></div>
                   </div>
                 </div>
               </div>
@@ -256,28 +308,7 @@ export default function Dashboard() {
 
         {/* ── Tab 3: Multi-Paper Comparison Matrix ── */}
         {activeTab === "compare" && (
-          <>
-            {completedPapers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-5 text-center">
-                <div className="text-6xl">📊</div>
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-100 mb-2">Compare Papers</h2>
-                  <p className="text-slate-400 max-w-md">
-                    Add at least 2–3 papers via{" "}
-                    <button
-                      onClick={() => setActiveTab("discovery")}
-                      className="text-blue-400 underline hover:text-blue-300"
-                    >
-                      Paper Discovery
-                    </button>{" "}
-                    first. Once they're indexed, the comparison matrix will automatically populate with their datasets, models, metrics, and limitations.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <ComparisonTable papers={ingestedPapers} />
-            )}
-          </>
+          <ComparisonTable papers={ingestedPapers} />
         )}
 
         {/* ── Tab 4: Literature Review Generator ── */}

@@ -1,22 +1,25 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { PaperSearchResult, PaperItem } from "@/lib/api";
 
 interface PaperCardProps {
   paper: PaperSearchResult | PaperItem;
   onIngest?: (paper: PaperSearchResult) => void;
+  onRemove?: (paperId: string) => void;
   isIngesting?: boolean;
 }
 
-export default function PaperCard({ paper, onIngest, isIngesting }: PaperCardProps) {
+export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: PaperCardProps) {
   const isIngestedItem = "status" in paper;
   const status = isIngestedItem ? (paper as PaperItem).status : null;
   const failureReason = isIngestedItem ? (paper as PaperItem).failure_reason : null;
+  const paperId = isIngestedItem ? (paper as PaperItem).id : null;
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const getStatusBadge = () => {
     if (!status) return null;
-
     const styles: Record<string, string> = {
       queued: "bg-amber-500/10 text-amber-400 border-amber-500/30",
       downloading: "bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse",
@@ -24,9 +27,8 @@ export default function PaperCard({ paper, onIngest, isIngesting }: PaperCardPro
       extracting: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30 animate-pulse",
       embedding: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30 animate-pulse",
       done: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-      failed: "bg-rose-500/10 text-rose-400 border-rose-500/30"
+      failed: "bg-rose-500/10 text-rose-400 border-rose-500/30",
     };
-
     return (
       <span className={`px-2.5 py-1 rounded-md text-xs font-mono border capitalize ${styles[status] || "bg-slate-800 text-slate-400"}`}>
         {status}
@@ -34,8 +36,21 @@ export default function PaperCard({ paper, onIngest, isIngesting }: PaperCardPro
     );
   };
 
+  const handleRemoveClick = () => {
+    if (!confirmingRemove) {
+      setConfirmingRemove(true);
+      // Auto-cancel confirm after 3s
+      setTimeout(() => setConfirmingRemove(false), 3000);
+      return;
+    }
+    // Second click — confirmed
+    if (!paperId || !onRemove) return;
+    setRemoving(true);
+    onRemove(paperId);
+  };
+
   return (
-    <div className="glass-panel rounded-xl p-5 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-4 group">
+    <div className={`glass-panel rounded-xl p-5 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-4 group relative ${removing ? "opacity-40 pointer-events-none" : ""}`}>
       <div>
         <div className="flex items-start justify-between gap-3 mb-2">
           <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
@@ -84,6 +99,7 @@ export default function PaperCard({ paper, onIngest, isIngesting }: PaperCardPro
             </a>
           )}
 
+          {/* Add to OS button (search results only) */}
           {!isIngestedItem && onIngest && (
             <button
               onClick={() => onIngest(paper as PaperSearchResult)}
@@ -95,6 +111,21 @@ export default function PaperCard({ paper, onIngest, isIngesting }: PaperCardPro
               }`}
             >
               {(paper as PaperSearchResult).already_ingested ? "✓ Ingested" : isIngesting ? "Ingesting..." : "+ Add to OS"}
+            </button>
+          )}
+
+          {/* Remove button (library cards only) */}
+          {isIngestedItem && onRemove && (
+            <button
+              onClick={handleRemoveClick}
+              className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-all border ${
+                confirmingRemove
+                  ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/20"
+                  : "bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-rose-950/40 hover:border-rose-800/60 hover:text-rose-400"
+              }`}
+              title={confirmingRemove ? "Click again to confirm removal" : "Remove from knowledge base"}
+            >
+              {confirmingRemove ? "⚠️ Confirm Remove" : "🗑 Remove"}
             </button>
           )}
         </div>

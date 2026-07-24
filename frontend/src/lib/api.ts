@@ -106,3 +106,12 @@ export async function exportCitations(paperIds: string[], formatType: string = "
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function deletePaper(paperId: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
