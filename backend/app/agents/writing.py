@@ -108,23 +108,53 @@ class WritingAgent:
         papers = DatabaseService.list_papers(db)
         db.close()
 
-        paper_summaries = [f"- **{p.title}**: {p.summary}" for p in papers[:5]]
-        combined_summaries = "\n".join(paper_summaries)
+        paper_entries = []
+        for p in papers[:8]:
+            sd = p.structured_data or {}
+            entry = f"Title: {p.title}\nSummary: {p.summary or 'N/A'}"
+            if sd.get("primary_task"):
+                entry += f"\nPrimary Task: {sd['primary_task']}"
+            if sd.get("methodology_summary"):
+                entry += f"\nMethodology: {sd['methodology_summary']}"
+            if sd.get("datasets_used"):
+                entry += f"\nDatasets: {', '.join(sd['datasets_used'])}"
+            if sd.get("benchmark_metrics"):
+                metrics = sd["benchmark_metrics"]
+                if isinstance(metrics, dict):
+                    entry += f"\nKey Metrics: {', '.join(f'{k}: {v}' for k, v in list(metrics.items())[:4])}"
+            if sd.get("limitations"):
+                entry += f"\nLimitations: {'; '.join(sd['limitations'][:3])}"
+            if sd.get("future_work"):
+                entry += f"\nFuture Work: {'; '.join(sd['future_work'][:2])}"
+            paper_entries.append(entry)
 
-        prompt = f"""Topic: {state.user_query}
-Ingested Papers Summary:
-{combined_summaries}
+        combined_papers = "\n\n---\n\n".join(paper_entries)
 
-Generate a structured Literature Review draft with sections:
-1. Introduction
-2. Background
-3. Existing Methods
-4. Limitations and Research Gaps
-5. Future Directions
+        REVIEW_SYSTEM_PROMPT = """You are an expert academic researcher and scientific writer.
+Your task is to write a thorough, well-structured literature review draft in proper academic prose.
+
+STRICT FORMATTING RULES:
+- Use markdown section headers: ## 1. Introduction, ## 2. Background, ## 3. Existing Methods & Key Contributions, ## 4. Limitations & Research Gaps, ## 5. Future Directions, ## References
+- Each section must contain at least 3–4 full paragraphs of dense, informative prose.
+- Do NOT use bullet points or asterisk (*) lists anywhere in the main sections. Write in complete sentences and paragraphs only.
+- Cite specific papers by name inline (e.g., "As demonstrated by GraphRAG under Fire,...").
+- The total output should be comprehensive and resemble a real academic survey paper section.
+- Under ## References, list each paper on its own line in this format: [1] Authors. "Title." arXiv preprint, Year.
+- Use neutral, precise academic language. Avoid vague filler phrases.
 """
+
+        prompt = f"""Write a comprehensive structured literature review on the following research topic.
+
+TOPIC: {state.user_query}
+
+AVAILABLE PAPERS ({len(paper_entries)} total):
+{combined_papers}
+
+Write the full literature review draft now, following all formatting rules strictly. Be thorough — each section should deeply analyze the state of the field, not just summarize individual papers."""
 
         review_text = await LLMFactory.invoke_llm(
             prompt=prompt,
+            system_prompt=REVIEW_SYSTEM_PROMPT,
             workload_type="interactive",
             temperature=0.3
         )
