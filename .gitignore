@@ -46,3 +46,9 @@ yarn-error.log*
 *.swo
 .DS_Store
 Thumbs.db
+
+# Screenshots & local demo images
+SS/
+image.png
+image copy.png
+*.png
