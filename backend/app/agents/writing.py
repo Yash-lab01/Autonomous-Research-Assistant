@@ -105,11 +105,17 @@ class WritingAgent:
     async def _generate_literature_review(state: ResearchAgentState) -> ResearchAgentState:
         state.step_logs.append("[Writing Agent] Synthesizing literature review draft...")
         db: Session = SessionLocal()
-        papers = DatabaseService.list_papers(db)
+        all_papers = DatabaseService.list_papers(db)
         db.close()
 
+        # Filter to only selected papers if paper_ids were provided
+        if state.paper_ids:
+            papers = [p for p in all_papers if p.id in state.paper_ids]
+        else:
+            papers = all_papers[:8]
+
         paper_entries = []
-        for p in papers[:8]:
+        for p in papers:
             sd = p.structured_data or {}
             entry = f"Title: {p.title}\nSummary: {p.summary or 'N/A'}"
             if sd.get("primary_task"):
@@ -129,6 +135,7 @@ class WritingAgent:
             paper_entries.append(entry)
 
         combined_papers = "\n\n---\n\n".join(paper_entries)
+
 
         REVIEW_SYSTEM_PROMPT = """You are an expert academic researcher and scientific writer.
 Your task is to write a thorough, well-structured literature review draft in proper academic prose.
