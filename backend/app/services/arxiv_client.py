@@ -10,6 +10,10 @@ from app.models.paper import PaperSearchResult
 
 logger = logging.getLogger("ai_research_os.arxiv_client")
 
+class ArxivRateLimitError(Exception):
+    """Raised when arXiv returns 429 or 503 — caller should surface this as HTTP 429."""
+    pass
+
 class ArxivClient:
     """
     Client for searching arXiv and fetching PDF binaries with API etiquette (~3s rate delay & custom User-Agent).
@@ -31,10 +35,12 @@ class ArxivClient:
 
         results: List[PaperSearchResult] = []
         try:
+            # num_retries=1: let the library try once more on transient errors,
+            # but don't hammer arXiv with 4 retries — we handle backoff ourselves.
             client = arxiv.Client(
                 page_size=max_results,
                 delay_seconds=settings.ARXIV_REQUEST_DELAY_SECONDS,
-                num_retries=3
+                num_retries=1
             )
             search = arxiv.Search(
                 query=query,
@@ -56,8 +62,16 @@ class ArxivClient:
                     summary=result.summary.replace("\n", " ").strip()
                 )
                 results.append(item)
+
         except Exception as e:
+            err_str = str(e)
             logger.error(f"Error executing arXiv search for '{query}': {e}")
+            # Detect rate-limit / server-overload responses
+            if "429" in err_str or "503" in err_str:
+                raise ArxivRateLimitError(
+                    "arXiv is temporarily rate-limiting requests. "
+                    "Please wait 30–60 seconds and try again."
+                )
             raise RuntimeError(f"arXiv Search Failed: {e}")
 
         return results

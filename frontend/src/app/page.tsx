@@ -40,6 +40,8 @@ export default function Dashboard() {
   const [ingestingId, setIngestingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [ingestError, setIngestError] = useState<string | null>(null);
   const libraryRef = useRef<HTMLDivElement>(null);
 
   const fetchIngestedPapers = async () => {
@@ -62,11 +64,19 @@ export default function Dashboard() {
     if (e) e.preventDefault();
     if (!searchQuery.trim() || isSearching) return;
     setIsSearching(true);
+    setSearchError(null);
+    setSearchResults([]);
     try {
       const results = await searchArxiv(searchQuery, 6);
       setSearchResults(results);
     } catch (err: any) {
-      alert(`Search Error: ${err.message || err}`);
+      // Parse a clean message — avoid showing raw JSON to the user
+      let msg = err?.message || String(err);
+      try {
+        const parsed = JSON.parse(msg);
+        msg = parsed?.detail || msg;
+      } catch {}
+      setSearchError(msg);
     } finally {
       setIsSearching(false);
     }
@@ -74,13 +84,16 @@ export default function Dashboard() {
 
   const handleIngest = async (paper: PaperSearchResult) => {
     setIngestingId(paper.arxiv_id);
+    setIngestError(null);
     try {
       await ingestPaper(paper);
       await fetchIngestedPapers();
       // Auto-reveal the library section when first paper is added
       setShowLibrary(true);
     } catch (err: any) {
-      alert(`Ingestion Error: ${err.message || err}`);
+      let msg = err?.message || String(err);
+      try { const p = JSON.parse(msg); msg = p?.detail || msg; } catch {}
+      setIngestError(msg);
     } finally {
       setIngestingId(null);
     }
@@ -92,7 +105,9 @@ export default function Dashboard() {
       await deletePaper(paperId);
       await fetchIngestedPapers();
     } catch (err: any) {
-      alert(`Remove Error: ${err.message || err}`);
+      let msg = err?.message || String(err);
+      try { const p = JSON.parse(msg); msg = p?.detail || msg; } catch {}
+      setIngestError(msg);
     } finally {
       setRemovingId(null);
     }
@@ -167,6 +182,23 @@ export default function Dashboard() {
                   {isSearching ? "Searching arXiv..." : "🔍 Search arXiv"}
                 </button>
               </form>
+
+              {/* Search Error Banner */}
+              {searchError && (
+                <div className="mt-4 flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                  <span className="text-xl shrink-0">⚠️</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-300">Search Failed</p>
+                    <p className="text-xs text-amber-200/70 mt-0.5 leading-relaxed">{searchError}</p>
+                  </div>
+                  <button
+                    onClick={() => setSearchError(null)}
+                    className="text-amber-400/60 hover:text-amber-300 text-lg shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* arXiv Search Results */}
@@ -269,6 +301,23 @@ export default function Dashboard() {
                   <span className="text-emerald-400 font-semibold">+ Add to OS</span> on any paper to
                   start building your knowledge base.
                 </p>
+              </div>
+            )}
+
+            {/* Ingest / Remove Error Banner */}
+            {ingestError && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30">
+                <span className="text-xl shrink-0">❌</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-rose-300">Action Failed</p>
+                  <p className="text-xs text-rose-200/70 mt-0.5 leading-relaxed">{ingestError}</p>
+                </div>
+                <button
+                  onClick={() => setIngestError(null)}
+                  className="text-rose-400/60 hover:text-rose-300 text-lg shrink-0"
+                >
+                  ✕
+                </button>
               </div>
             )}
           </div>

@@ -11,7 +11,7 @@ from app.models.paper import (
     PaperMetadata, PaperStatus, PaperSearchQuery, PaperSearchResult,
     StructuredPaperExtraction, ComparisonMatrix, LiteratureReviewDraft
 )
-from app.services.arxiv_client import ArxivClient
+from app.services.arxiv_client import ArxivClient, ArxivRateLimitError
 from app.services.ingestion import IngestionPipeline
 from app.agents.graph import ResearchOrchestrator
 
@@ -61,6 +61,12 @@ async def search_arxiv_papers(req: PaperSearchQuery, db: Session = Depends(get_d
             if existing and existing.status == PaperStatus.DONE:
                 r.already_ingested = True
         return results
+    except ArxivRateLimitError as e:
+        logger.warning(f"arXiv rate limit hit for query '{req.query}': {e}")
+        raise HTTPException(
+            status_code=429,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"Search API error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
