@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 
 interface NavbarProps {
-  activeTab: "discovery" | "chat" | "compare" | "review";
-  setActiveTab: (tab: "discovery" | "chat" | "compare" | "review") => void;
+  activeTab: "discovery" | "chat" | "compare" | "review" | "gaps";
+  setActiveTab: (tab: "discovery" | "chat" | "compare" | "review" | "gaps") => void;
   ingestedCount: number;
 }
 
 const TABS: {
-  id: "discovery" | "chat" | "compare" | "review";
+  id: "discovery" | "chat" | "compare" | "review" | "gaps";
   icon: string;
   label: string;
   shortLabel: string;
@@ -48,6 +48,14 @@ const TABS: {
     hint: "Step 4 — Auto-generate a survey draft with citations",
     step: 4,
   },
+  {
+    id: "gaps",
+    icon: "⚡",
+    label: "Research Gaps",
+    shortLabel: "Gaps",
+    hint: "Step 5 — Discover open problems & novel thesis ideas",
+    step: 5,
+  },
 ];
 
 export default function Navbar({ activeTab, setActiveTab, ingestedCount }: NavbarProps) {
@@ -70,7 +78,7 @@ export default function Navbar({ activeTab, setActiveTab, ingestedCount }: Navba
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 relative">
+        <nav className="flex items-center gap-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 relative overflow-x-auto custom-scrollbar">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             const isHovered = hoveredTab === tab.id;
@@ -80,7 +88,7 @@ export default function Navbar({ activeTab, setActiveTab, ingestedCount }: Navba
                   onClick={() => setActiveTab(tab.id)}
                   onMouseEnter={() => setHoveredTab(tab.id)}
                   onMouseLeave={() => setHoveredTab(null)}
-                  className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                  className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                     isActive
                       ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
                       : "text-slate-400 hover:text-white hover:bg-slate-800/50"

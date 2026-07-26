@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperSearchResult, PaperItem } from "@/lib/api";
+import { PaperSearchResult, PaperItem, updatePaperNotes } from "@/lib/api";
 
 interface PaperCardProps {
   paper: PaperSearchResult | PaperItem;
@@ -15,8 +15,17 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
   const status = isIngestedItem ? (paper as PaperItem).status : null;
   const failureReason = isIngestedItem ? (paper as PaperItem).failure_reason : null;
   const paperId = isIngestedItem ? (paper as PaperItem).id : null;
+  const initialNotes = isIngestedItem ? (paper as PaperItem).notes || "" : "";
+  const initialTags = isIngestedItem ? (paper as PaperItem).tags || [] : [];
+
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [notesText, setNotesText] = useState(initialNotes);
+  const [tagInput, setTagInput] = useState(initialTags.join(", "));
+  const [tagsList, setTagsList] = useState<string[]>(initialTags);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   const getStatusBadge = () => {
     if (!status) return null;
@@ -39,14 +48,32 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
   const handleRemoveClick = () => {
     if (!confirmingRemove) {
       setConfirmingRemove(true);
-      // Auto-cancel confirm after 3s
       setTimeout(() => setConfirmingRemove(false), 3000);
       return;
     }
-    // Second click — confirmed
     if (!paperId || !onRemove) return;
     setRemoving(true);
     onRemove(paperId);
+  };
+
+  const handleSaveNotes = async () => {
+    if (!paperId) return;
+    setSavingNotes(true);
+    const parsedTags = tagInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    try {
+      await updatePaperNotes(paperId, notesText, parsedTags);
+      setTagsList(parsedTags);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2000);
+    } catch (err: any) {
+      alert(`Error saving notes: ${err.message || err}`);
+    } finally {
+      setSavingNotes(false);
+    }
   };
 
   return (
@@ -69,6 +96,20 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
           </p>
         )}
 
+        {/* Existing Tags Chips */}
+        {tagsList.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {tagsList.map((tag, idx) => (
+              <span
+                key={idx}
+                className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
         {paper.summary && (
           <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
             {paper.summary}
@@ -78,6 +119,65 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
         {failureReason && (
           <div className="mt-3 p-2 rounded bg-rose-950/40 border border-rose-800/40 text-xs text-rose-300 font-mono">
             ⚠️ Failure: {failureReason}
+          </div>
+        )}
+
+        {/* Collapsible Personal Notes & Tags Section */}
+        {isIngestedItem && (
+          <div className="mt-3 pt-3 border-t border-slate-800/80">
+            <button
+              onClick={() => setShowNotes(!showNotes)}
+              className="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+            >
+              <span>{showNotes ? "▲ Hide Notes & Tags" : "📝 Notes & Tags"}</span>
+              {notesText && !showNotes && (
+                <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              )}
+            </button>
+
+            {showNotes && (
+              <div className="mt-3 space-y-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                    Personal Researcher Notes
+                  </label>
+                  <textarea
+                    value={notesText}
+                    onChange={(e) => setNotesText(e.target.value)}
+                    placeholder="Add personal thoughts, key formulas, or takeaways..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500/60 resize-none h-16"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                    Tags (comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="e.g. GraphRAG, Priority, Survey..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500/60"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  {savedSuccess ? (
+                    <span className="text-[10px] text-emerald-400 font-semibold">✓ Notes saved!</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-500">Saved to local DB</span>
+                  )}
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                    className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-all shadow"
+                  >
+                    {savingNotes ? "Saving..." : "Save Notes"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -99,7 +199,6 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
             </a>
           )}
 
-          {/* Add to OS button (search results only) */}
           {!isIngestedItem && onIngest && (
             <button
               onClick={() => onIngest(paper as PaperSearchResult)}
@@ -114,7 +213,6 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
             </button>
           )}
 
-          {/* Remove button (library cards only) */}
           {isIngestedItem && onRemove && (
             <button
               onClick={handleRemoveClick}

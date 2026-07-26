@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem } from "@/lib/api";
+import { PaperItem, getExportComparisonCSVUrl } from "@/lib/api";
 
 interface ComparisonTableProps {
   papers: PaperItem[];
@@ -229,9 +229,18 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                   Technical taxonomy across {selectedPapers.length} selected papers
                 </p>
               </div>
-              <span className="text-xs font-mono text-slate-500 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
-                {selectedPapers.length} papers · {ATTR_ROWS.length} attributes
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-slate-500 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+                  {selectedPapers.length} papers · {ATTR_ROWS.length} attributes
+                </span>
+                <a
+                  href={getExportComparisonCSVUrl(selectedPapers.map(p => p.id))}
+                  download="research_comparison_matrix.csv"
+                  className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 text-xs font-medium transition-all flex items-center gap-1.5"
+                >
+                  📥 Export CSV
+                </a>
+              </div>
             </div>
 
             <div className="overflow-x-auto custom-scrollbar">

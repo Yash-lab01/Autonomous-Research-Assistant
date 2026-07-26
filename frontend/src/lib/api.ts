@@ -34,6 +34,8 @@ export interface PaperItem {
     future_work: string[];
     bibtex?: string;
   };
+  notes?: string;
+  tags?: string[];
   created_at: string;
 }
 
@@ -52,6 +54,12 @@ export interface ChatResponse {
   step_logs: string[];
   comparison_data?: any;
   literature_review?: any;
+}
+
+export interface GapAnalysisResponse {
+  paper_count: number;
+  gaps_markdown: string;
+  paper_titles?: string[];
 }
 
 export async function searchArxiv(query: string, maxResults: number = 6): Promise<PaperSearchResult[]> {
@@ -115,3 +123,30 @@ export async function deletePaper(paperId: string): Promise<{ message: string }>
   return res.json();
 }
 
+export async function updatePaperNotes(paperId: string, notes?: string, tags?: string[]): Promise<{ message: string; notes?: string; tags?: string[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}/notes`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ notes, tags })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchResearchGaps(paperIds?: string[]): Promise<GapAnalysisResponse> {
+  const params = new URLSearchParams();
+  if (paperIds && paperIds.length > 0) {
+    paperIds.forEach(id => params.append("paper_ids", id));
+  }
+  const res = await fetch(`${API_BASE_URL}/api/gaps?${params.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export function getExportComparisonCSVUrl(paperIds?: string[]): string {
+  const params = new URLSearchParams({ format_type: "csv" });
+  if (paperIds && paperIds.length > 0) {
+    paperIds.forEach(id => params.append("paper_ids", id));
+  }
+  return `${API_BASE_URL}/api/papers/export?${params.toString()}`;
+}

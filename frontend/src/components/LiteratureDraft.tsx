@@ -185,6 +185,20 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
     });
   }, [citationOutput]);
 
+  const handleDownloadMarkdown = () => {
+    if (!reviewContent) return;
+    const fullMd = `# ${topic}\n\n${reviewContent}\n\n${citationOutput ? `## References (${citationFormat.toUpperCase()})\n\n${citationOutput}` : ""}`;
+    const blob = new Blob([fullMd], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Literature_Review_${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // ── Empty state ──────────────────────────────────────────────────────────
   if (completedPapers.length === 0) {
     return (
@@ -359,8 +373,14 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
                 ✓ Draft Ready
               </span>
               <button
+                onClick={handleDownloadMarkdown}
+                className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 text-xs font-medium transition-all flex items-center gap-1.5"
+              >
+                📥 Download (.md)
+              </button>
+              <button
                 onClick={() => exportAsPdf(topic, reviewContent, citationOutput, citationFormat)}
-                className="px-4 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white text-xs font-medium transition-all flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white text-xs font-medium transition-all flex items-center gap-1.5"
               >
                 🖨️ Save as PDF
               </button>

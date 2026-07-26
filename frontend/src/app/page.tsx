@@ -6,6 +6,7 @@ import PaperCard from "@/components/PaperCard";
 import ChatInterface from "@/components/ChatInterface";
 import ComparisonTable from "@/components/ComparisonTable";
 import LiteratureDraft from "@/components/LiteratureDraft";
+import ResearchGaps from "@/components/ResearchGaps";
 import { searchArxiv, ingestPaper, getPapers, deletePaper, PaperSearchResult, PaperItem } from "@/lib/api";
 
 const WORKFLOW_STEPS = [
@@ -29,10 +30,15 @@ const WORKFLOW_STEPS = [
     title: "4. Generate Review",
     desc: "Auto-generate a structured literature survey draft with references.",
   },
+  {
+    icon: "⚡",
+    title: "5. Discover Gaps",
+    desc: "Synthesize limitations & future work to find open research problems.",
+  },
 ];
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "review">("discovery");
+  const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "review" | "gaps">("discovery");
   const [searchQuery, setSearchQuery] = useState(""); // ← always blank on load
   const [searchResults, setSearchResults] = useState<PaperSearchResult[]>([]);
   const [ingestedPapers, setIngestedPapers] = useState<PaperItem[]>([]);
@@ -363,6 +369,11 @@ export default function Dashboard() {
         {/* ── Tab 4: Literature Review Generator ── */}
         {activeTab === "review" && (
           <LiteratureDraft papers={ingestedPapers} />
+        )}
+
+        {/* ── Tab 5: Research Gap & Innovation Agent ── */}
+        {activeTab === "gaps" && (
+          <ResearchGaps papers={ingestedPapers} />
         )}
       </main>
     </div>
