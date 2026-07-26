@@ -7,6 +7,7 @@ import ChatInterface from "@/components/ChatInterface";
 import ComparisonTable from "@/components/ComparisonTable";
 import LiteratureDraft from "@/components/LiteratureDraft";
 import ResearchGaps from "@/components/ResearchGaps";
+import ResearchTimeline from "@/components/ResearchTimeline";
 import { searchArxiv, ingestPaper, getPapers, deletePaper, PaperSearchResult, PaperItem } from "@/lib/api";
 
 const WORKFLOW_STEPS = [
@@ -35,17 +36,22 @@ const WORKFLOW_STEPS = [
     title: "5. Discover Gaps",
     desc: "Synthesize limitations & future work to find open research problems.",
   },
+  {
+    icon: "🗓️",
+    title: "6. Field Evolution",
+    desc: "Chronological timeline of tasks, models, and benchmark metrics over time.",
+  },
 ];
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "review" | "gaps">("discovery");
+  const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "review" | "gaps" | "timeline">("discovery");
   const [searchQuery, setSearchQuery] = useState(""); // ← always blank on load
   const [searchResults, setSearchResults] = useState<PaperSearchResult[]>([]);
   const [ingestedPapers, setIngestedPapers] = useState<PaperItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [ingestingId, setIngestingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [showLibrary, setShowLibrary] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
   const libraryRef = useRef<HTMLDivElement>(null);
@@ -374,6 +380,11 @@ export default function Dashboard() {
         {/* ── Tab 5: Research Gap & Innovation Agent ── */}
         {activeTab === "gaps" && (
           <ResearchGaps papers={ingestedPapers} />
+        )}
+
+        {/* ── Tab 6: Interactive Research Timeline ── */}
+        {activeTab === "timeline" && (
+          <ResearchTimeline papers={ingestedPapers} />
         )}
       </main>
     </div>

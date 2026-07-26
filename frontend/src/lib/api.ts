@@ -62,14 +62,70 @@ export interface GapAnalysisResponse {
   paper_titles?: string[];
 }
 
+export interface TimelinePaperNode {
+  id: string;
+  arxiv_id?: string;
+  title: string;
+  authors: string[];
+  published_date: string;
+  year: string;
+  primary_task: string;
+  methodology_summary: string;
+  backbone_models: string[];
+  datasets_used: string[];
+  benchmark_metrics: Record<string, any>;
+  pdf_url?: string;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface TimelineMilestone {
+  year: string;
+  papers: TimelinePaperNode[];
+  paper_count: number;
+}
+
+export interface TimelineResponse {
+  milestones: TimelineMilestone[];
+  total_papers: number;
+  taxonomies: {
+    unique_tasks: string[];
+    unique_models: string[];
+    unique_datasets: string[];
+  };
+}
+
+export interface PaperFigure {
+  figure_id: string;
+  paper_id: string;
+  page_number: number;
+  file_path: string;
+  url: string;
+  width: number;
+  height: number;
+  caption: string;
+}
+
 export async function searchArxiv(query: string, maxResults: number = 6): Promise<PaperSearchResult[]> {
-  const res = await fetch(`${API_BASE_URL}/api/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, max_results: maxResults })
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, max_results: maxResults }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("arXiv search request timed out. arXiv may be temporarily slow or throttling — please try again in a few seconds.");
+    }
+    throw err;
+  }
 }
 
 export async function ingestPaper(paper: Partial<PaperSearchResult>): Promise<{ paper_id: string; status: string }> {
@@ -149,4 +205,20 @@ export function getExportComparisonCSVUrl(paperIds?: string[]): string {
     paperIds.forEach(id => params.append("paper_ids", id));
   }
   return `${API_BASE_URL}/api/papers/export?${params.toString()}`;
+}
+
+export async function fetchTimelineData(paperIds?: string[]): Promise<TimelineResponse> {
+  const params = new URLSearchParams();
+  if (paperIds && paperIds.length > 0) {
+    paperIds.forEach(id => params.append("paper_ids", id));
+  }
+  const res = await fetch(`${API_BASE_URL}/api/timeline?${params.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchPaperFigures(paperId: string): Promise<{ paper_id: string; figure_count: number; figures: PaperFigure[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}/figures`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
