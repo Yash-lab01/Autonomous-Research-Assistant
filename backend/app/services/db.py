@@ -13,8 +13,19 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+from sqlalchemy import inspect, text
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Automatic column migration for existing SQLite DBs
+    inspector = inspect(engine)
+    if "papers" in inspector.get_table_names():
+        columns = [c["name"] for c in inspector.get_columns("papers")]
+        with engine.begin() as conn:
+            if "notes" not in columns:
+                conn.execute(text("ALTER TABLE papers ADD COLUMN notes TEXT"))
+            if "tags_json" not in columns:
+                conn.execute(text("ALTER TABLE papers ADD COLUMN tags_json TEXT DEFAULT '[]'"))
 
 def get_db():
     db = SessionLocal()
