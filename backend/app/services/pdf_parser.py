@@ -117,3 +117,63 @@ class HybridPDFParser:
         except Exception as e:
             logger.error(f"Docling fallback extraction error on {pdf_path}: {e}")
             return []
+
+    @staticmethod
+    def extract_figures(pdf_path: str, paper_id: str) -> List[dict]:
+        """
+        Extracts embedded figures and diagrams from PDF pages.
+        Saves images to data/figures/{paper_id}/
+        Returns list of figure metadata dictionaries.
+        """
+        from app.config import settings
+        figures: List[dict] = []
+        pdf_file = Path(pdf_path)
+        if not pdf_file.exists():
+            return figures
+
+        output_dir = settings.FIGURES_DIR / paper_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                fig_count = 1
+                for page_idx, page in enumerate(pdf.pages, start=1):
+                    images = getattr(page, "images", [])
+                    if images:
+                        for img_obj in images[:3]: # Max 3 per page
+                            try:
+                                x0, top, x1, bottom = img_obj["x0"], img_obj["top"], img_obj["x1"], img_obj["bottom"]
+                                width = x1 - x0
+                                height = bottom - top
+                                # Filter out tiny icons or full-page graphics
+                                if width > 80 and height > 60 and width < page.width * 0.95 and height < page.height * 0.95:
+                                    cropped = page.crop((x0, top, x1, bottom))
+                                    fig_filename = f"fig_p{page_idx}_{fig_count}.png"
+                                    fig_path = output_dir / fig_filename
+                                    
+                                    pil_img = cropped.to_image(resolution=150).original
+                                    pil_img.save(fig_path, format="PNG")
+
+                                    rel_url = f"/figures/{paper_id}/{fig_filename}"
+                                    figures.append({
+                                        "figure_id": f"{paper_id}_fig{fig_count}",
+                                        "paper_id": paper_id,
+                                        "page_number": page_idx,
+                                        "file_path": str(fig_path),
+                                        "url": rel_url,
+                                        "width": int(width),
+                                        "height": int(height),
+                                        "caption": f"Extracted Figure on Page {page_idx} ({int(width)}x{int(height)}px)"
+                                    })
+                                    fig_count += 1
+                                    if len(figures) >= 8:
+                                        break
+                            except Exception as img_err:
+                                logger.debug(f"Could not crop image on page {page_idx}: {img_err}")
+                    if len(figures) >= 8:
+                        break
+        except Exception as e:
+            logger.error(f"Error extracting figures for paper {paper_id}: {e}")
+
+        return figures
+

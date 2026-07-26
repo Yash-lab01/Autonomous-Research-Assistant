@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Storage Paths
     STORAGE_DIR: Path = BASE_DIR / "data"
     PAPERS_DIR: Path = BASE_DIR / "data" / "papers"
+    FIGURES_DIR: Path = BASE_DIR / "data" / "figures"
     
     # arXiv Etiquette
     ARXIV_REQUEST_DELAY_SECONDS: float = 3.0
@@ -40,3 +41,4 @@ settings = Settings()
 # Ensure storage directories exist
 settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 settings.PAPERS_DIR.mkdir(parents=True, exist_ok=True)
+settings.FIGURES_DIR.mkdir(parents=True, exist_ok=True)

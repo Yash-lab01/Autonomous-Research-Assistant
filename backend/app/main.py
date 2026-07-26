@@ -5,6 +5,7 @@ import io
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -17,6 +18,8 @@ from app.models.paper import (
 )
 from app.services.arxiv_client import ArxivClient, ArxivRateLimitError
 from app.services.ingestion import IngestionPipeline
+from app.services.pdf_parser import HybridPDFParser
+from app.services.timeline import TimelineService
 from app.agents.graph import ResearchOrchestrator
 from app.agents.gap_finder import GapFinderAgent
 
@@ -37,6 +40,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure static figures directory exists
+figures_dir = settings.FIGURES_DIR
+figures_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/figures", StaticFiles(directory=str(figures_dir)), name="figures")
 
 @app.on_event("startup")
 def startup_event():
@@ -318,3 +326,91 @@ def export_comparison_matrix(
         )
     
     return {"papers": [p.structured_data for p in papers]}
+
+@app.get("/api/timeline")
+def get_research_timeline(
+    paper_ids: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns chronological paper evolution milestones, taxonomy progression, and citation links.
+    """
+    return TimelineService.build_timeline(db, paper_ids=paper_ids)
+
+@app.get("/api/papers/{paper_id}/figures")
+def get_paper_figures(paper_id: str, db: Session = Depends(get_db)):
+    """
+    Extracts & returns figure diagram image URLs and captions for a paper.
+    """
+    paper = DatabaseService.get_paper_by_id(db, paper_id)
+    if not paper or not paper.local_pdf_path:
+        raise HTTPException(status_code=404, detail="Paper PDF not found")
+    
+    figures = HybridPDFParser.extract_figures(paper.local_pdf_path, paper_id)
+    return {"paper_id": paper_id, "figure_count": len(figures), "figures": figures}
+
+class DigestWebhookRequest(BaseModel):
+    topic: str
+    max_results: int = 5
+
+@app.post("/api/webhooks/arxiv-digest")
+async def trigger_arxiv_digest_webhook(
+    req: DigestWebhookRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    n8n Webhook Endpoint: Discovers & auto-ingests top research papers for a topic.
+    """
+    try:
+        results = await ArxivClient.search(query=req.topic, max_results=req.max_results)
+        ingested = []
+        for r in results:
+            existing = DatabaseService.get_paper_by_arxiv_id(db, r.arxiv_id)
+            if not existing:
+                paper_data = PaperMetadata(
+                    id=f"paper_{uuid.uuid4().hex[:8]}",
+                    arxiv_id=r.arxiv_id,
+                    title=r.title,
+                    authors=r.authors,
+                    published_date=r.published_date,
+                    pdf_url=r.pdf_url,
+                    summary=r.summary,
+                    status=PaperStatus.QUEUED
+                )
+                DatabaseService.create_paper(db, paper_data)
+                background_tasks.add_task(IngestionPipeline.run_pipeline, paper_data.id)
+                ingested.append(r.title)
+        
+        return {
+            "status": "success",
+            "topic": req.topic,
+            "discovered_count": len(results),
+            "ingested_titles": ingested
+        }
+    except Exception as e:
+        logger.error(f"Digest webhook error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/digest/summary")
+async def get_digest_summary(db: Session = Depends(get_db)):
+    """
+    n8n Summary Digest Endpoint: Returns formatted recent paper summaries & gap analysis payload.
+    """
+    papers = DatabaseService.list_papers(db, limit=10)
+    gaps = await GapFinderAgent.analyze_gaps()
+    return {
+        "digest_title": "AI Research OS — Weekly Intelligence Digest",
+        "timestamp": uuid.uuid4().hex[:8],
+        "total_library_papers": len(papers),
+        "recent_papers": [
+            {
+                "title": p.title,
+                "arxiv_id": p.arxiv_id,
+                "task": (p.structured_data or {}).get("primary_task", "N/A"),
+                "summary": p.summary
+            }
+            for p in papers[:5]
+        ],
+        "research_gaps_report": gaps.get("gaps_markdown", "")
+    }
