@@ -47,6 +47,8 @@ class PaperMetadata(BaseModel):
     failure_reason: Optional[str] = None
     extraction_parser: Optional[str] = None # pdfplumber vs docling
     structured_data: Optional[StructuredPaperExtraction] = None
+    notes: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
     paragraph_count: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

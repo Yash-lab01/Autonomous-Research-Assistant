@@ -1,9 +1,13 @@
 import uuid
 import logging
+import csv
+import io
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.config import settings
 from app.services.db import init_db, get_db, DatabaseService
@@ -14,6 +18,7 @@ from app.models.paper import (
 from app.services.arxiv_client import ArxivClient, ArxivRateLimitError
 from app.services.ingestion import IngestionPipeline
 from app.agents.graph import ResearchOrchestrator
+from app.agents.gap_finder import GapFinderAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai_research_os.main")
@@ -134,11 +139,15 @@ def list_papers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
             "title": p.title,
             "authors": p.authors,
             "published_date": p.published_date,
+            "pdf_url": p.pdf_url,
+            "summary": p.summary,
             "status": p.status,
             "failure_reason": p.failure_reason,
             "extraction_parser": p.extraction_parser,
             "paragraph_count": p.paragraph_count,
             "structured_data": p.structured_data,
+            "notes": p.notes,
+            "tags": p.tags,
             "created_at": p.created_at
         }
         for p in papers
@@ -162,7 +171,9 @@ def get_paper_details(paper_id: str, db: Session = Depends(get_db)):
             "status": paper.status,
             "failure_reason": paper.failure_reason,
             "extraction_parser": paper.extraction_parser,
-            "structured_data": paper.structured_data
+            "structured_data": paper.structured_data,
+            "notes": paper.notes,
+            "tags": paper.tags
         },
         "paragraphs": [
             {
@@ -238,3 +249,72 @@ def export_citations(
         "format": format_type,
         "content": "\n\n".join(result)
     }
+
+class NotesUpdate(BaseModel):
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+@app.patch("/api/papers/{paper_id}/notes")
+def update_paper_notes(paper_id: str, body: NotesUpdate, db: Session = Depends(get_db)):
+    """
+    Update personal researcher notes and tags for a paper.
+    """
+    paper = DatabaseService.update_paper_notes(db, paper_id, notes=body.notes, tags=body.tags)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    return {"message": "Paper notes updated", "paper_id": paper_id, "notes": paper.notes, "tags": paper.tags}
+
+@app.get("/api/gaps")
+async def analyze_research_gaps(paper_ids: Optional[List[str]] = Query(None)):
+    """
+    Analyze open research gaps, common limitations, and novel project ideas across ingested papers.
+    """
+    result = await GapFinderAgent.analyze_gaps(paper_ids=paper_ids)
+    return result
+
+@app.get("/api/papers/export")
+def export_comparison_matrix(
+    paper_ids: Optional[List[str]] = Query(None),
+    format_type: str = Query("csv"),
+    db: Session = Depends(get_db)
+):
+    """
+    Exports paper metadata & structured comparison data as downloadable CSV.
+    """
+    all_papers = DatabaseService.list_papers(db)
+    if paper_ids:
+        papers = [p for p in all_papers if p.id in paper_ids and (p.status.value == "done" or p.status == "done")]
+    else:
+        papers = [p for p in all_papers if (p.status.value == "done" or p.status == "done")]
+
+    if format_type.lower() == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "arXiv ID", "Title", "Primary Task", "Backbone Models", 
+            "Datasets Used", "Benchmark Metrics", "Limitations", "Future Work", "Notes", "Tags"
+        ])
+        for p in papers:
+            sd = p.structured_data or {}
+            metrics = sd.get("benchmark_metrics", {})
+            metrics_str = "; ".join([f"{k}: {v}" for k, v in metrics.items()]) if isinstance(metrics, dict) else str(metrics)
+            writer.writerow([
+                p.arxiv_id or p.id,
+                p.title,
+                sd.get("primary_task", ""),
+                ", ".join(sd.get("backbone_models", [])),
+                ", ".join(sd.get("datasets_used", [])),
+                metrics_str,
+                "; ".join(sd.get("limitations", [])),
+                "; ".join(sd.get("future_work", [])),
+                p.notes or "",
+                ", ".join(p.tags or [])
+            ])
+        csv_content = output.getvalue()
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=research_comparison_matrix.csv"}
+        )
+    
+    return {"papers": [p.structured_data for p in papers]}

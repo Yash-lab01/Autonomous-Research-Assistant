@@ -23,6 +23,8 @@ class PaperORM(Base):
     failure_reason = Column(Text, nullable=True)
     extraction_parser = Column(String, nullable=True)
     structured_data_json = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    tags_json = Column(Text, default="[]")
     paragraph_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -34,6 +36,14 @@ class PaperORM(Base):
     @authors.setter
     def authors(self, value):
         self.authors_json = json.dumps(value or [])
+
+    @property
+    def tags(self):
+        return json.loads(self.tags_json or "[]")
+
+    @tags.setter
+    def tags(self, value):
+        self.tags_json = json.dumps(value or [])
 
     @property
     def categories(self):

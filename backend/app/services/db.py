@@ -122,3 +122,21 @@ class DatabaseService:
         db.delete(paper)
         db.commit()
         return True
+
+    @staticmethod
+    def update_paper_notes(
+        db: Session,
+        paper_id: str,
+        notes: Optional[str] = None,
+        tags: Optional[List[str]] = None
+    ) -> Optional[PaperORM]:
+        paper = db.query(PaperORM).filter(PaperORM.id == paper_id).first()
+        if not paper:
+            return None
+        if notes is not None:
+            paper.notes = notes
+        if tags is not None:
+            paper.tags = tags
+        db.commit()
+        db.refresh(paper)
+        return paper
