@@ -33,48 +33,50 @@ class ArxivClient:
     async def search(cls, query: str, max_results: int = 5) -> List[PaperSearchResult]:
         await cls._enforce_rate_limit()
 
-        results: List[PaperSearchResult] = []
-        try:
-            # num_retries=1: let the library try once more on transient errors,
-            # but don't hammer arXiv with 4 retries — we handle backoff ourselves.
-            client = arxiv.Client(
-                page_size=max_results,
-                delay_seconds=settings.ARXIV_REQUEST_DELAY_SECONDS,
-                num_retries=1
-            )
-            search = arxiv.Search(
-                query=query,
-                max_results=max_results,
-                sort_by=arxiv.SortCriterion.Relevance
-            )
-
-            for result in client.results(search):
-                arxiv_id = result.entry_id.split("/")[-1].split("v")[0]
-                authors = [a.name for a in result.authors]
-                published_str = result.published.strftime("%Y-%m-%d") if result.published else ""
-
-                item = PaperSearchResult(
-                    arxiv_id=arxiv_id,
-                    title=result.title.replace("\n", " ").strip(),
-                    authors=authors,
-                    published_date=published_str,
-                    pdf_url=result.pdf_url,
-                    summary=result.summary.replace("\n", " ").strip()
+        def _sync_search() -> List[PaperSearchResult]:
+            """Run the synchronous arxiv library in a thread to avoid blocking the event loop."""
+            results_list: List[PaperSearchResult] = []
+            try:
+                client = arxiv.Client(
+                    page_size=max_results,
+                    delay_seconds=1.0,  # reduced from 3s — we enforce our own rate limit above
+                    num_retries=1
                 )
-                results.append(item)
-
-        except Exception as e:
-            err_str = str(e)
-            logger.error(f"Error executing arXiv search for '{query}': {e}")
-            # Detect rate-limit / server-overload responses
-            if "429" in err_str or "503" in err_str:
-                raise ArxivRateLimitError(
-                    "arXiv is temporarily rate-limiting requests. "
-                    "Please wait 30–60 seconds and try again."
+                search = arxiv.Search(
+                    query=query,
+                    max_results=max_results,
+                    sort_by=arxiv.SortCriterion.Relevance
                 )
-            raise RuntimeError(f"arXiv Search Failed: {e}")
 
+                for result in client.results(search):
+                    arxiv_id = result.entry_id.split("/")[-1].split("v")[0]
+                    authors = [a.name for a in result.authors]
+                    published_str = result.published.strftime("%Y-%m-%d") if result.published else ""
+
+                    item = PaperSearchResult(
+                        arxiv_id=arxiv_id,
+                        title=result.title.replace("\n", " ").strip(),
+                        authors=authors,
+                        published_date=published_str,
+                        pdf_url=result.pdf_url,
+                        summary=result.summary.replace("\n", " ").strip()
+                    )
+                    results_list.append(item)
+            except Exception as e:
+                err_str = str(e)
+                logger.error(f"Error executing arXiv search for '{query}': {e}")
+                if "429" in err_str or "503" in err_str:
+                    raise ArxivRateLimitError(
+                        "arXiv is temporarily rate-limiting requests. "
+                        "Please wait 30–60 seconds and try again."
+                    )
+                raise RuntimeError(f"arXiv Search Failed: {e}")
+            return results_list
+
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, _sync_search)
         return results
+
 
     @classmethod
     async def download_pdf(cls, pdf_url: str, arxiv_id: str) -> Path:

@@ -161,6 +161,55 @@ def list_papers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
         for p in papers
     ]
 
+# NOTE: /api/papers/export MUST be declared BEFORE /api/papers/{paper_id}
+# FastAPI matches routes in order — if {paper_id} comes first, 'export' gets swallowed as a paper_id.
+@app.get("/api/papers/export")
+def export_comparison_matrix(
+    paper_ids: Optional[List[str]] = Query(None),
+    format_type: str = Query("csv"),
+    db: Session = Depends(get_db)
+):
+    """
+    Exports paper metadata & structured comparison data as downloadable CSV.
+    """
+    all_papers = DatabaseService.list_papers(db)
+    if paper_ids:
+        papers = [p for p in all_papers if p.id in paper_ids and (p.status.value == "done" or p.status == "done")]
+    else:
+        papers = [p for p in all_papers if (p.status.value == "done" or p.status == "done")]
+
+    if format_type.lower() == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "arXiv ID", "Title", "Primary Task", "Backbone Models", 
+            "Datasets Used", "Benchmark Metrics", "Limitations", "Future Work", "Notes", "Tags"
+        ])
+        for p in papers:
+            sd = p.structured_data or {}
+            metrics = sd.get("benchmark_metrics", {})
+            metrics_str = "; ".join([f"{k}: {v}" for k, v in metrics.items()]) if isinstance(metrics, dict) else str(metrics)
+            writer.writerow([
+                p.arxiv_id or p.id,
+                p.title,
+                sd.get("primary_task", ""),
+                ", ".join(sd.get("backbone_models", [])),
+                ", ".join(sd.get("datasets_used", [])),
+                metrics_str,
+                "; ".join(sd.get("limitations", [])),
+                "; ".join(sd.get("future_work", [])),
+                p.notes or "",
+                ", ".join(p.tags or [])
+            ])
+        csv_content = output.getvalue()
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=research_comparison_matrix.csv"}
+        )
+    
+    return {"papers": [p.structured_data for p in papers]}
+
 @app.get("/api/papers/{paper_id}")
 def get_paper_details(paper_id: str, db: Session = Depends(get_db)):
     paper = DatabaseService.get_paper_by_id(db, paper_id)
@@ -279,53 +328,6 @@ async def analyze_research_gaps(paper_ids: Optional[List[str]] = Query(None)):
     """
     result = await GapFinderAgent.analyze_gaps(paper_ids=paper_ids)
     return result
-
-@app.get("/api/papers/export")
-def export_comparison_matrix(
-    paper_ids: Optional[List[str]] = Query(None),
-    format_type: str = Query("csv"),
-    db: Session = Depends(get_db)
-):
-    """
-    Exports paper metadata & structured comparison data as downloadable CSV.
-    """
-    all_papers = DatabaseService.list_papers(db)
-    if paper_ids:
-        papers = [p for p in all_papers if p.id in paper_ids and (p.status.value == "done" or p.status == "done")]
-    else:
-        papers = [p for p in all_papers if (p.status.value == "done" or p.status == "done")]
-
-    if format_type.lower() == "csv":
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow([
-            "arXiv ID", "Title", "Primary Task", "Backbone Models", 
-            "Datasets Used", "Benchmark Metrics", "Limitations", "Future Work", "Notes", "Tags"
-        ])
-        for p in papers:
-            sd = p.structured_data or {}
-            metrics = sd.get("benchmark_metrics", {})
-            metrics_str = "; ".join([f"{k}: {v}" for k, v in metrics.items()]) if isinstance(metrics, dict) else str(metrics)
-            writer.writerow([
-                p.arxiv_id or p.id,
-                p.title,
-                sd.get("primary_task", ""),
-                ", ".join(sd.get("backbone_models", [])),
-                ", ".join(sd.get("datasets_used", [])),
-                metrics_str,
-                "; ".join(sd.get("limitations", [])),
-                "; ".join(sd.get("future_work", [])),
-                p.notes or "",
-                ", ".join(p.tags or [])
-            ])
-        csv_content = output.getvalue()
-        return Response(
-            content=csv_content,
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=research_comparison_matrix.csv"}
-        )
-    
-    return {"papers": [p.structured_data for p in papers]}
 
 @app.get("/api/timeline")
 def get_research_timeline(
