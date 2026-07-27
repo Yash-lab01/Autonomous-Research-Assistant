@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperSearchResult, PaperItem, updatePaperNotes } from "@/lib/api";
+import { PaperSearchResult, PaperItem, updatePaperNotes, fetchPaperFigures, PaperFigure } from "@/lib/api";
 
 interface PaperCardProps {
   paper: PaperSearchResult | PaperItem;
@@ -21,6 +21,11 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [showFigures, setShowFigures] = useState(false);
+  const [figures, setFigures] = useState<PaperFigure[]>([]);
+  const [loadingFigures, setLoadingFigures] = useState(false);
+  const [activeLightboxFig, setActiveLightboxFig] = useState<PaperFigure | null>(null);
+
   const [notesText, setNotesText] = useState(initialNotes);
   const [tagInput, setTagInput] = useState(initialTags.join(", "));
   const [tagsList, setTagsList] = useState<string[]>(initialTags);
@@ -76,6 +81,23 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
     }
   };
 
+  const handleToggleFigures = async () => {
+    if (!showFigures && paperId && figures.length === 0) {
+      setLoadingFigures(true);
+      try {
+        const res = await fetchPaperFigures(paperId);
+        setFigures(res.figures);
+      } catch (err) {
+        console.error("Error fetching figures:", err);
+      } finally {
+        setLoadingFigures(false);
+      }
+    }
+    setShowFigures(!showFigures);
+  };
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   return (
     <div className={`glass-panel rounded-xl p-5 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-4 group relative ${removing ? "opacity-40 pointer-events-none" : ""}`}>
       <div>
@@ -122,21 +144,31 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
           </div>
         )}
 
-        {/* Collapsible Personal Notes & Tags Section */}
+        {/* Collapsible Action Section for Ingested Papers */}
         {isIngestedItem && (
-          <div className="mt-3 pt-3 border-t border-slate-800/80">
-            <button
-              onClick={() => setShowNotes(!showNotes)}
-              className="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition-colors"
-            >
-              <span>{showNotes ? "▲ Hide Notes & Tags" : "📝 Notes & Tags"}</span>
-              {notesText && !showNotes && (
-                <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-              )}
-            </button>
+          <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowNotes(!showNotes)}
+                className="text-xs font-medium text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+              >
+                <span>{showNotes ? "▲ Hide Notes" : "📝 Notes & Tags"}</span>
+                {notesText && !showNotes && (
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                )}
+              </button>
 
+              <button
+                onClick={handleToggleFigures}
+                className="text-xs font-medium text-slate-400 hover:text-purple-400 flex items-center gap-1.5 transition-colors"
+              >
+                <span>{showFigures ? "▲ Hide Diagrams" : "🖼️ Figures"}</span>
+              </button>
+            </div>
+
+            {/* Notes Editor */}
             {showNotes && (
-              <div className="mt-3 space-y-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+              <div className="space-y-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                 <div>
                   <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
                     Personal Researcher Notes
@@ -176,6 +208,40 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
                     {savingNotes ? "Saving..." : "Save Notes"}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Figures Gallery Drawer */}
+            {showFigures && (
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-purple-500/30 space-y-2">
+                <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider block">
+                  Extracted Architecture Diagrams & Plots
+                </span>
+
+                {loadingFigures ? (
+                  <div className="text-xs text-slate-500 py-2 text-center">Extracting figures from PDF...</div>
+                ) : figures.length === 0 ? (
+                  <div className="text-xs text-slate-500 py-2 text-center">No inline diagrams detected in PDF pages.</div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    {figures.map((fig) => (
+                      <button
+                        key={fig.figure_id}
+                        onClick={() => setActiveLightboxFig(fig)}
+                        className="group/fig relative aspect-video rounded-lg overflow-hidden border border-slate-800 hover:border-purple-500 bg-slate-900 flex items-center justify-center transition-all"
+                      >
+                        <img
+                          src={`${API_BASE}${fig.url}`}
+                          alt={fig.caption}
+                          className="object-cover w-full h-full group-hover/fig:scale-105 transition-transform"
+                        />
+                        <span className="absolute bottom-1 right-1 bg-slate-950/80 text-purple-300 text-[9px] px-1 rounded font-mono">
+                          p.{fig.page_number}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -228,6 +294,52 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {activeLightboxFig && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6"
+          onClick={() => setActiveLightboxFig(null)}
+        >
+          <div
+            className="max-w-4xl w-full glass-panel rounded-2xl p-6 border border-purple-500/40 space-y-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-purple-300">{activeLightboxFig.caption}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Extracted from {paper.title}</p>
+              </div>
+              <button
+                onClick={() => setActiveLightboxFig(null)}
+                className="text-slate-400 hover:text-white text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex justify-center bg-slate-950 p-4 rounded-xl max-h-[60vh] overflow-auto">
+              <img
+                src={`${API_BASE}${activeLightboxFig.url}`}
+                alt={activeLightboxFig.caption}
+                className="object-contain max-h-[55vh]"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Page Number: {activeLightboxFig.page_number}</span>
+              <a
+                href={`${API_BASE}${activeLightboxFig.url}`}
+                target="_blank"
+                download
+                className="px-3 py-1.5 rounded-lg bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 font-medium"
+              >
+                📥 Download Figure
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { sendChatQuery, ChatResponse, CitationItem, PaperItem } from "@/lib/api";
 
 interface ChatInterfaceProps {
@@ -21,6 +21,74 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
   const [loading, setLoading] = useState(false);
   const [activeCitation, setActiveCitation] = useState<CitationItem | null>(null);
 
+  // Voice Research Mode states
+  const [isListening, setIsListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+
+  // Speech Recognition setup
+  const handleMicClick = () => {
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((r: any) => r[0].transcript)
+        .join("");
+      setQuery(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  // Text-to-Speech playback
+  const speakText = (text: string, index: number) => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel(); // Stop any current speech
+
+    if (speakingIndex === index) {
+      setSpeakingIndex(null);
+      return;
+    }
+
+    const cleanText = text.replace(/##\s+/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\[\d+\]/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => setSpeakingIndex(null);
+    utterance.onerror = () => setSpeakingIndex(null);
+
+    setSpeakingIndex(index);
+    window.speechSynthesis.speak(utterance);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim() || loading) return;
@@ -32,6 +100,7 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
 
     try {
       const res: ChatResponse = await sendChatQuery(userText, selectedPaperIds);
+      const newIndex = messages.length + 1;
       setMessages(prev => [
         ...prev,
         {
@@ -41,6 +110,11 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
           stepLogs: res.step_logs
         }
       ]);
+
+      // Auto-speak response if voice mode enabled
+      if (voiceEnabled && "speechSynthesis" in window) {
+        speakText(res.response, newIndex);
+      }
     } catch (err: any) {
       setMessages(prev => [
         ...prev,
@@ -71,23 +145,39 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar max-w-xl">
-          {papers.map(p => {
-            const isSelected = selectedPaperIds.includes(p.id);
-            return (
-              <button
-                key={p.id}
-                onClick={() => togglePaperSelection(p.id)}
-                className={`text-xs px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${
-                  isSelected
-                    ? "bg-blue-600/30 text-blue-300 border-blue-500/50"
-                    : "bg-slate-800/60 text-slate-400 border-slate-700 hover:text-slate-200"
-                }`}
-              >
-                {p.title.slice(0, 22)}...
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-3">
+          {/* Voice Output Toggle */}
+          <button
+            type="button"
+            onClick={() => setVoiceEnabled(!voiceEnabled)}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 ${
+              voiceEnabled
+                ? "bg-purple-600/20 text-purple-300 border-purple-500/40"
+                : "bg-slate-800/60 text-slate-500 border-slate-700"
+            }`}
+            title="Auto-read assistant responses using Speech Synthesis"
+          >
+            <span>{voiceEnabled ? "🔊 Voice Mode ON" : "🔇 Voice Mode OFF"}</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar max-w-sm">
+            {papers.map(p => {
+              const isSelected = selectedPaperIds.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => togglePaperSelection(p.id)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${
+                    isSelected
+                      ? "bg-blue-600/30 text-blue-300 border-blue-500/50"
+                      : "bg-slate-800/60 text-slate-400 border-slate-700 hover:text-slate-200"
+                  }`}
+                >
+                  {p.title.slice(0, 18)}...
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -99,12 +189,23 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
             className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
           >
             <div
-              className={`max-w-3xl rounded-2xl p-5 leading-relaxed text-sm ${
+              className={`max-w-3xl rounded-2xl p-5 leading-relaxed text-sm relative group ${
                 m.role === "user"
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20 rounded-br-none"
                   : "bg-slate-900/90 text-slate-200 border border-slate-800 rounded-bl-none"
               }`}
             >
+              {/* Speaker button for Assistant messages */}
+              {m.role === "assistant" && (
+                <button
+                  onClick={() => speakText(m.content, idx)}
+                  className="absolute top-3 right-3 text-slate-400 hover:text-purple-300 transition-colors p-1 rounded-md bg-slate-950/60"
+                  title="Read response aloud"
+                >
+                  {speakingIndex === idx ? "⏸️" : "🔊"}
+                </button>
+              )}
+
               {/* Step Logs Accordion for Assistant */}
               {m.stepLogs && m.stepLogs.length > 0 && (
                 <details className="mb-3 p-2 rounded bg-slate-950/60 border border-slate-800 text-xs font-mono text-slate-400">
@@ -148,15 +249,30 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
         )}
       </div>
 
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 bg-slate-900/80 border-t border-slate-800 flex gap-3">
+      {/* Input Form with Push-to-Talk Mic */}
+      <form onSubmit={handleSubmit} className="p-4 bg-slate-900/80 border-t border-slate-800 flex gap-3 items-center">
+        {/* Push-to-Talk Microphone Button */}
+        <button
+          type="button"
+          onClick={handleMicClick}
+          className={`p-3 rounded-xl border transition-all ${
+            isListening
+              ? "bg-rose-600 border-rose-500 text-white animate-pulse shadow-lg shadow-rose-600/30"
+              : "bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:border-purple-500/60"
+          }`}
+          title={isListening ? "Listening... Click to stop" : "Push-to-talk microphone"}
+        >
+          {isListening ? "🎙️ Recording..." : "🎤"}
+        </button>
+
         <input
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Ask a technical question, compare datasets, or generate literature review..."
+          placeholder={isListening ? "Listening to your voice..." : "Ask a technical question, compare datasets, or generate literature review..."}
           className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60"
         />
+
         <button
           type="submit"
           disabled={loading || !query.trim()}

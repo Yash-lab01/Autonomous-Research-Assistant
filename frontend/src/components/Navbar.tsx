@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 
 interface NavbarProps {
-  activeTab: "discovery" | "chat" | "compare" | "review" | "gaps";
-  setActiveTab: (tab: "discovery" | "chat" | "compare" | "review" | "gaps") => void;
+  activeTab: "discovery" | "chat" | "compare" | "review" | "gaps" | "timeline";
+  setActiveTab: (tab: "discovery" | "chat" | "compare" | "review" | "gaps" | "timeline") => void;
   ingestedCount: number;
 }
 
 const TABS: {
-  id: "discovery" | "chat" | "compare" | "review" | "gaps";
+  id: "discovery" | "chat" | "compare" | "review" | "gaps" | "timeline";
   icon: string;
   label: string;
   shortLabel: string;
@@ -55,6 +55,14 @@ const TABS: {
     shortLabel: "Gaps",
     hint: "Step 5 — Discover open problems & novel thesis ideas",
     step: 5,
+  },
+  {
+    id: "timeline",
+    icon: "🗓️",
+    label: "Field Evolution",
+    shortLabel: "Timeline",
+    hint: "Step 6 — Chronological timeline of tasks, models & benchmarks",
+    step: 6,
   },
 ];
 
