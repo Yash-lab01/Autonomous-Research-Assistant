@@ -57,6 +57,7 @@ class PaperSearchQuery(BaseModel):
     query: str
     max_results: int = 5
     categories: Optional[List[str]] = None
+    sort_by: str = "relevance"  # "relevance" | "date" | "updated"
 
 class PaperSearchResult(BaseModel):
     arxiv_id: str

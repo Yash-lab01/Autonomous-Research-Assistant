@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [showLibrary, setShowLibrary] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"relevance" | "date" | "updated">("relevance");
   const libraryRef = useRef<HTMLDivElement>(null);
 
   const fetchIngestedPapers = async () => {
@@ -79,7 +80,7 @@ export default function Dashboard() {
     setSearchError(null);
     setSearchResults([]);
     try {
-      const results = await searchArxiv(searchQuery, 6);
+      const results = await searchArxiv(searchQuery, 6, sortBy);
       setSearchResults(results);
     } catch (err: any) {
       // Parse a clean message — avoid showing raw JSON to the user
@@ -178,21 +179,48 @@ export default function Dashboard() {
                   and index a paper into your library.
                 </p>
               </div>
-              <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g. GraphRAG, Agentic RAG, Qwen2.5-VL, LoRA fine-tuning..."
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60"
-                />
-                <button
-                  type="submit"
-                  disabled={isSearching || !searchQuery.trim()}
-                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 transition-all"
-                >
-                  {isSearching ? "Searching arXiv..." : "🔍 Search arXiv"}
-                </button>
+              <form onSubmit={handleSearch} className="flex flex-col gap-3">
+                {/* Sort Options */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-medium shrink-0">Sort by:</span>
+                  {([
+                    { key: "relevance", label: "🎯 Relevance", desc: "Best keyword match" },
+                    { key: "date",      label: "🆕 Latest",    desc: "Newest submissions" },
+                    { key: "updated",   label: "🔄 Updated",   desc: "Recently revised" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setSortBy(opt.key)}
+                      title={opt.desc}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                        sortBy === opt.key
+                          ? "bg-blue-600/30 text-blue-300 border-blue-500/50"
+                          : "bg-slate-900/60 text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-500"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search Input Row */}
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="e.g. GraphRAG, Agentic RAG, Qwen2.5-VL, LoRA fine-tuning..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 transition-all"
+                  >
+                    {isSearching ? "Searching arXiv..." : "🔍 Search arXiv"}
+                  </button>
+                </div>
               </form>
 
               {/* Search Error Banner */}

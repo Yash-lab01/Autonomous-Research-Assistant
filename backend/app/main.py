@@ -63,11 +63,15 @@ def read_root():
 @app.post("/api/search", response_model=List[PaperSearchResult])
 async def search_arxiv_papers(req: PaperSearchQuery, db: Session = Depends(get_db)):
     """
-    Search arXiv for research papers with rate-limiting & etiquette.
+    Search arXiv for research papers.
+    sort_by: "relevance" | "date" | "updated"
     """
     try:
-        results = await ArxivClient.search(query=req.query, max_results=req.max_results)
-        
+        results = await ArxivClient.search(
+            query=req.query,
+            max_results=req.max_results,
+            sort_by=req.sort_by
+        )
         # Mark already_ingested flags
         for r in results:
             existing = DatabaseService.get_paper_by_arxiv_id(db, r.arxiv_id)
@@ -76,13 +80,11 @@ async def search_arxiv_papers(req: PaperSearchQuery, db: Session = Depends(get_d
         return results
     except ArxivRateLimitError as e:
         logger.warning(f"arXiv rate limit hit for query '{req.query}': {e}")
-        raise HTTPException(
-            status_code=429,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         logger.error(f"Search API error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/ingest")
 async def ingest_paper(

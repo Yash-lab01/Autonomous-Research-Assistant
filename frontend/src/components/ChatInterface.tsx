@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { sendChatQuery, ChatResponse, CitationItem, PaperItem } from "@/lib/api";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface ChatInterfaceProps {
   papers: PaperItem[];
@@ -220,7 +221,12 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
                 </details>
               )}
 
-              <div className="whitespace-pre-wrap">{m.content}</div>
+              {/* Message content — use MarkdownRenderer for assistant, plain text for user */}
+              {m.role === "assistant" ? (
+                <MarkdownRenderer content={m.content} className="text-sm" />
+              ) : (
+                <div className="whitespace-pre-wrap">{m.content}</div>
+              )}
 
               {/* Citations List Badges */}
               {m.citations && m.citations.length > 0 && (

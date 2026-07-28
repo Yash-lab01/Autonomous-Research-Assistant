@@ -106,14 +106,18 @@ export interface PaperFigure {
   caption: string;
 }
 
-export async function searchArxiv(query: string, maxResults: number = 6): Promise<PaperSearchResult[]> {
+export async function searchArxiv(
+  query: string,
+  maxResults: number = 6,
+  sortBy: "relevance" | "date" | "updated" = "relevance"
+): Promise<PaperSearchResult[]> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
     const res = await fetch(`${API_BASE_URL}/api/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, max_results: maxResults }),
+      body: JSON.stringify({ query, max_results: maxResults, sort_by: sortBy }),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -127,6 +131,7 @@ export async function searchArxiv(query: string, maxResults: number = 6): Promis
     throw err;
   }
 }
+
 
 export async function ingestPaper(paper: Partial<PaperSearchResult>): Promise<{ paper_id: string; status: string }> {
   const params = new URLSearchParams({

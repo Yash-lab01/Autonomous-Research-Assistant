@@ -36,16 +36,32 @@ class PaperExtractor:
     ) -> StructuredPaperExtraction:
         """
         Extracts structured JSON metadata using LLMFactory (bulk workload default).
+        Handles [TABLE] chunks (passed as markdown) and [MATH] chunks (preserved as-is).
         """
-        # Combine title, abstract, and sample text from introductory & evaluation paragraphs
-        sample_texts = [p.text for p in paragraphs[:15]] # Top 15 paragraphs cover abstract, intro, methods
-        combined_text = f"TITLE: {title}\nABSTRACT: {abstract}\n\nCONTENT SAMPLE:\n" + "\n\n".join(sample_texts)
+        # Separate tables, math, and regular text for better LLM context
+        table_chunks = [p for p in paragraphs if p.text.startswith("[TABLE]")]
+        regular_chunks = [p for p in paragraphs if not p.text.startswith("[TABLE]")]
+
+        # Sample first 12 regular paragraphs (intro, methods, results sections)
+        sample_texts = [p.text for p in regular_chunks[:12]]
+
+        # Include up to 3 tables — these often contain the benchmark metrics we need
+        table_texts = [p.text for p in table_chunks[:3]]
+
+        combined_text = (
+            f"TITLE: {title}\n"
+            f"ABSTRACT: {abstract}\n\n"
+            "CONTENT SAMPLE:\n" + "\n\n".join(sample_texts)
+        )
+        if table_texts:
+            combined_text += "\n\nEXTRACTED TABLES (use for benchmark_metrics):\n" + "\n\n".join(table_texts)
 
         prompt = f"""Extract structured information from the following research paper text:
 
-{combined_text[:6000]}
+{combined_text[:7000]}
 
 Provide the output strictly as a valid JSON object."""
+
 
         try:
             raw_response = await LLMFactory.invoke_llm(

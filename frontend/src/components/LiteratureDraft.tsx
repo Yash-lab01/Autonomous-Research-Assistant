@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { exportCitations, PaperItem } from "@/lib/api";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface LiteratureDraftProps {
   papers: PaperItem[];
@@ -387,9 +388,9 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
             </div>
           </div>
 
-          {/* Rendered Review Body */}
+          {/* Rendered Review Body — supports markdown tables, math/KaTeX, bold, headers */}
           <div className="px-8 py-6 max-w-4xl">
-            {renderMarkdownReview(reviewContent)}
+            <MarkdownRenderer content={reviewContent} />
           </div>
 
           {/* Citation Export Block */}

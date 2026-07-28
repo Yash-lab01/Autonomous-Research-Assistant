@@ -16,7 +16,8 @@ class ArxivRateLimitError(Exception):
 
 class ArxivClient:
     """
-    Client for searching arXiv and fetching PDF binaries with API etiquette (~3s rate delay & custom User-Agent).
+    Client for searching arXiv and fetching PDF binaries with API etiquette & custom User-Agent.
+    The synchronous arxiv library is run via run_in_executor to never block the async event loop.
     """
 
     _last_request_time: float = 0.0
@@ -30,29 +31,39 @@ class ArxivClient:
         cls._last_request_time = time.time()
 
     @classmethod
-    async def search(cls, query: str, max_results: int = 5) -> List[PaperSearchResult]:
+    async def search(cls, query: str, max_results: int = 5, sort_by: str = "relevance") -> List[PaperSearchResult]:
+        """
+        Search arXiv for papers.
+        sort_by: "relevance" (best match) | "date" (newest submitted) | "updated" (recently revised)
+        """
         await cls._enforce_rate_limit()
 
+        # Map string option to arxiv library SortCriterion
+        sort_map = {
+            "relevance": arxiv.SortCriterion.Relevance,
+            "date":      arxiv.SortCriterion.SubmittedDate,
+            "updated":   arxiv.SortCriterion.LastUpdatedDate,
+        }
+        sort_criterion = sort_map.get(sort_by, arxiv.SortCriterion.Relevance)
+
         def _sync_search() -> List[PaperSearchResult]:
-            """Run the synchronous arxiv library in a thread to avoid blocking the event loop."""
+            """Run the blocking arxiv library in a thread pool to avoid freezing the event loop."""
             results_list: List[PaperSearchResult] = []
             try:
                 client = arxiv.Client(
                     page_size=max_results,
-                    delay_seconds=1.0,  # reduced from 3s — we enforce our own rate limit above
+                    delay_seconds=1.0,
                     num_retries=1
                 )
                 search = arxiv.Search(
                     query=query,
                     max_results=max_results,
-                    sort_by=arxiv.SortCriterion.Relevance
+                    sort_by=sort_criterion
                 )
-
                 for result in client.results(search):
                     arxiv_id = result.entry_id.split("/")[-1].split("v")[0]
                     authors = [a.name for a in result.authors]
                     published_str = result.published.strftime("%Y-%m-%d") if result.published else ""
-
                     item = PaperSearchResult(
                         arxiv_id=arxiv_id,
                         title=result.title.replace("\n", " ").strip(),
@@ -74,9 +85,7 @@ class ArxivClient:
             return results_list
 
         loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, _sync_search)
-        return results
-
+        return await loop.run_in_executor(None, _sync_search)
 
     @classmethod
     async def download_pdf(cls, pdf_url: str, arxiv_id: str) -> Path:
@@ -90,14 +99,11 @@ class ArxivClient:
             logger.info(f"PDF for {arxiv_id} already exists locally at {target_file}")
             return target_file
 
-        headers = {
-            "User-Agent": settings.ARXIV_USER_AGENT
-        }
+        headers = {"User-Agent": settings.ARXIV_USER_AGENT}
 
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             res = await client.get(pdf_url, headers=headers)
             res.raise_for_status()
-
             with open(target_file, "wb") as f:
                 f.write(res.content)
 
