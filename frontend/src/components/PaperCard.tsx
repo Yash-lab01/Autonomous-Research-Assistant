@@ -25,6 +25,7 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
   const [figures, setFigures] = useState<PaperFigure[]>([]);
   const [loadingFigures, setLoadingFigures] = useState(false);
   const [activeLightboxFig, setActiveLightboxFig] = useState<PaperFigure | null>(null);
+  const [figuresAiCaptioned, setFiguresAiCaptioned] = useState(false);
 
   const [notesText, setNotesText] = useState(initialNotes);
   const [tagInput, setTagInput] = useState(initialTags.join(", "));
@@ -87,6 +88,7 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
       try {
         const res = await fetchPaperFigures(paperId);
         setFigures(res.figures);
+        setFiguresAiCaptioned(res.ai_captioned ?? false);
       } catch (err) {
         console.error("Error fetching figures:", err);
       } finally {
@@ -214,12 +216,21 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
             {/* Figures Gallery Drawer */}
             {showFigures && (
               <div className="p-3 rounded-xl bg-slate-950/80 border border-purple-500/30 space-y-2">
-                <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider block">
-                  Extracted Architecture Diagrams & Plots
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">
+                    Extracted Figures & Diagrams
+                  </span>
+                  {figuresAiCaptioned && (
+                    <span className="flex items-center gap-1 text-[9px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
+                      🤖 AI Captions
+                    </span>
+                  )}
+                </div>
 
                 {loadingFigures ? (
-                  <div className="text-xs text-slate-500 py-2 text-center">Extracting figures from PDF...</div>
+                  <div className="text-xs text-slate-500 py-2 text-center animate-pulse">
+                    {figuresAiCaptioned !== undefined ? "Extracting & captioning figures..." : "Extracting figures from PDF..."}
+                  </div>
                 ) : figures.length === 0 ? (
                   <div className="text-xs text-slate-500 py-2 text-center">No inline diagrams detected in PDF pages.</div>
                 ) : (
@@ -235,9 +246,12 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
                           alt={fig.caption}
                           className="object-cover w-full h-full group-hover/fig:scale-105 transition-transform"
                         />
-                        <span className="absolute bottom-1 right-1 bg-slate-950/80 text-purple-300 text-[9px] px-1 rounded font-mono">
-                          p.{fig.page_number}
-                        </span>
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 to-transparent p-1.5">
+                          {fig.ai_captioned && (
+                            <span className="text-[8px] text-emerald-400 font-semibold">🤖 AI</span>
+                          )}
+                          <span className="text-[9px] text-slate-400 font-mono ml-1">p.{fig.page_number}</span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -306,13 +320,21 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h4 className="text-sm font-bold text-purple-300">{activeLightboxFig.caption}</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Extracted from {paper.title}</p>
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-center gap-2 mb-1">
+                  {activeLightboxFig.ai_captioned ? (
+                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">🤖 AI Caption</span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-800/60 border border-slate-700 px-1.5 py-0.5 rounded-full">📄 Auto</span>
+                  )}
+                  <span className="text-[10px] text-slate-500 font-mono">Page {activeLightboxFig.page_number}</span>
+                </div>
+                <p className="text-sm text-slate-200 leading-relaxed">{activeLightboxFig.caption}</p>
+                <p className="text-xs text-slate-500 mt-0.5">From: {paper.title}</p>
               </div>
               <button
                 onClick={() => setActiveLightboxFig(null)}
-                className="text-slate-400 hover:text-white text-lg"
+                className="text-slate-400 hover:text-white text-lg shrink-0"
               >
                 ✕
               </button>
@@ -327,7 +349,7 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Page Number: {activeLightboxFig.page_number}</span>
+              <span>Size: {activeLightboxFig.width}×{activeLightboxFig.height}px</span>
               <a
                 href={`${API_BASE}${activeLightboxFig.url}`}
                 target="_blank"

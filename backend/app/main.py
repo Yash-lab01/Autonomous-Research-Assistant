@@ -20,6 +20,7 @@ from app.services.arxiv_client import ArxivClient, ArxivRateLimitError
 from app.services.ingestion import IngestionPipeline
 from app.services.pdf_parser import HybridPDFParser
 from app.services.timeline import TimelineService
+from app.services.vision import VisionCaptioner
 from app.agents.graph import ResearchOrchestrator
 from app.agents.gap_finder import GapFinderAgent
 
@@ -342,16 +343,54 @@ def get_research_timeline(
     return TimelineService.build_timeline(db, paper_ids=paper_ids)
 
 @app.get("/api/papers/{paper_id}/figures")
-def get_paper_figures(paper_id: str, db: Session = Depends(get_db)):
+async def get_paper_figures(paper_id: str, db: Session = Depends(get_db)):
     """
-    Extracts & returns figure diagram image URLs and captions for a paper.
+    Extracts figure diagram images from a paper's PDF and generates AI captions
+    using the local vision model (qwen2.5vl:3b via Ollama).
+    Falls back to page-number descriptions if vision model is unavailable.
     """
     paper = DatabaseService.get_paper_by_id(db, paper_id)
     if not paper or not paper.local_pdf_path:
         raise HTTPException(status_code=404, detail="Paper PDF not found")
-    
+
     figures = HybridPDFParser.extract_figures(paper.local_pdf_path, paper_id)
-    return {"paper_id": paper_id, "figure_count": len(figures), "figures": figures}
+
+    # Generate AI captions if vision model is available
+    vision_ok = await VisionCaptioner.is_available()
+    if vision_ok and figures:
+        logger.info(f"Generating vision captions for {len(figures)} figures (paper {paper_id})")
+        for fig in figures:
+            fig["caption"] = await VisionCaptioner.caption_figure(
+                image_path=fig["file_path"],
+                page_number=fig["page_number"],
+                paper_title=paper.title or ""
+            )
+            fig["ai_captioned"] = True
+    else:
+        for fig in figures:
+            fig["ai_captioned"] = False
+        if not vision_ok:
+            logger.info("Vision model not available — returning figures with fallback captions")
+
+    return {
+        "paper_id": paper_id,
+        "figure_count": len(figures),
+        "ai_captioned": vision_ok,
+        "figures": figures
+    }
+
+@app.get("/api/vision/status")
+async def get_vision_status():
+    """
+    Returns whether the local vision model (for figure captioning) is available.
+    Frontend uses this to show/hide the AI caption badge on figure cards.
+    """
+    available = await VisionCaptioner.is_available()
+    return {
+        "available": available,
+        "model": settings.OLLAMA_VISION_MODEL,
+        "ollama_url": settings.OLLAMA_BASE_URL
+    }
 
 class DigestWebhookRequest(BaseModel):
     topic: str

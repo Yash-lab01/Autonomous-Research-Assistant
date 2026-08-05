@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     GROQ_PRIMARY_MODEL: str = "llama-3.3-70b-versatile"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_FALLBACK_MODEL: str = "qwen2.5:7b"
+    OLLAMA_VISION_MODEL: str = "qwen2.5vl:3b"  # Local vision model for figure captioning
     
     # Infrastructure
     QDRANT_URL: str = "http://localhost:6333"

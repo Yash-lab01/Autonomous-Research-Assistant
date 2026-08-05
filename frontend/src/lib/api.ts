@@ -104,6 +104,7 @@ export interface PaperFigure {
   width: number;
   height: number;
   caption: string;
+  ai_captioned?: boolean;
 }
 
 export async function searchArxiv(
@@ -222,8 +223,14 @@ export async function fetchTimelineData(paperIds?: string[]): Promise<TimelineRe
   return res.json();
 }
 
-export async function fetchPaperFigures(paperId: string): Promise<{ paper_id: string; figure_count: number; figures: PaperFigure[] }> {
+export async function fetchPaperFigures(paperId: string): Promise<{ paper_id: string; figure_count: number; ai_captioned: boolean; figures: PaperFigure[] }> {
   const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}/figures`);
   if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchVisionStatus(): Promise<{ available: boolean; model: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/vision/status`);
+  if (!res.ok) return { available: false, model: "unknown" };
   return res.json();
 }
