@@ -8,7 +8,7 @@ import ComparisonTable from "@/components/ComparisonTable";
 import LiteratureDraft from "@/components/LiteratureDraft";
 import ResearchGaps from "@/components/ResearchGaps";
 import ResearchTimeline from "@/components/ResearchTimeline";
-import { searchArxiv, ingestPaper, getPapers, deletePaper, PaperSearchResult, PaperItem } from "@/lib/api";
+import { searchArxiv, ingestPaper, ingestAllPapers, retryPaper, getPapers, deletePaper, PaperSearchResult, PaperItem } from "@/lib/api";
 
 const WORKFLOW_STEPS = [
   {
@@ -50,11 +50,16 @@ export default function Dashboard() {
   const [ingestedPapers, setIngestedPapers] = useState<PaperItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [ingestingId, setIngestingId] = useState<string | null>(null);
+  const [isBatchIngesting, setIsBatchIngesting] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"relevance" | "date" | "updated">("relevance");
+  const [maxResults, setMaxResults] = useState<3 | 6 | 10 | 15>(6);
+  const [libraryFilter, setLibraryFilter] = useState("");
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const libraryRef = useRef<HTMLDivElement>(null);
 
   const fetchIngestedPapers = async () => {
@@ -73,6 +78,11 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!searchQuery.trim() || isSearching) return;
@@ -80,7 +90,7 @@ export default function Dashboard() {
     setSearchError(null);
     setSearchResults([]);
     try {
-      const results = await searchArxiv(searchQuery, 6, sortBy);
+      const results = await searchArxiv(searchQuery, maxResults, sortBy);
       setSearchResults(results);
     } catch (err: any) {
       // Parse a clean message — avoid showing raw JSON to the user
@@ -101,14 +111,45 @@ export default function Dashboard() {
     try {
       await ingestPaper(paper);
       await fetchIngestedPapers();
-      // Auto-reveal the library section when first paper is added
       setShowLibrary(true);
+      showToast(`"${paper.title.slice(0, 50)}..." added to library`);
     } catch (err: any) {
       let msg = err?.message || String(err);
       try { const p = JSON.parse(msg); msg = p?.detail || msg; } catch {}
       setIngestError(msg);
     } finally {
       setIngestingId(null);
+    }
+  };
+
+  const handleIngestAll = async () => {
+    const notYetIngested = searchResults.filter(r => !ingestedPapers.some(p => p.arxiv_id === r.arxiv_id));
+    if (!notYetIngested.length) return;
+    setIsBatchIngesting(true);
+    try {
+      const res = await ingestAllPapers(notYetIngested);
+      await fetchIngestedPapers();
+      setShowLibrary(true);
+      showToast(`Queued ${res.queued.length} papers${res.skipped.length ? `, skipped ${res.skipped.length} duplicates` : ""}`);
+    } catch (err: any) {
+      let msg = err?.message || String(err);
+      try { const p = JSON.parse(msg); msg = p?.detail || msg; } catch {}
+      showToast(msg, "error");
+    } finally {
+      setIsBatchIngesting(false);
+    }
+  };
+
+  const handleRetry = async (paperId: string) => {
+    setRetryingId(paperId);
+    try {
+      await retryPaper(paperId);
+      await fetchIngestedPapers();
+      showToast("Paper re-queued for retry");
+    } catch (err: any) {
+      showToast("Retry failed: " + (err?.message || String(err)), "error");
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -180,44 +221,40 @@ export default function Dashboard() {
                 </p>
               </div>
               <form onSubmit={handleSearch} className="flex flex-col gap-3">
-                {/* Sort Options */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-medium shrink-0">Sort by:</span>
-                  {([
-                    { key: "relevance", label: "🎯 Relevance", desc: "Best keyword match" },
-                    { key: "date",      label: "🆕 Latest",    desc: "Newest submissions" },
-                    { key: "updated",   label: "🔄 Updated",   desc: "Recently revised" },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setSortBy(opt.key)}
-                      title={opt.desc}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                        sortBy === opt.key
-                          ? "bg-blue-600/30 text-blue-300 border-blue-500/50"
-                          : "bg-slate-900/60 text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-500"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                {/* Sort + Count Row */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium shrink-0">Sort by:</span>
+                    {(["relevance", "date", "updated"] as const).map((key) => (
+                      <button key={key} type="button" onClick={() => setSortBy(key)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                          sortBy === key ? "bg-blue-600/30 text-blue-300 border-blue-500/50" : "bg-slate-900/60 text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-500"
+                        }`}>
+                        {key === "relevance" ? "🎯 Relevance" : key === "date" ? "🆕 Latest" : "🔄 Updated"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-xs text-slate-500 font-medium shrink-0">Results:</span>
+                    {([3, 6, 10, 15] as const).map((n) => (
+                      <button key={n} type="button" onClick={() => setMaxResults(n)}
+                        className={`w-9 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                          maxResults === n ? "bg-blue-600/30 text-blue-300 border-blue-500/50" : "bg-slate-900/60 text-slate-400 border-slate-700 hover:text-slate-200"
+                        }`}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Search Input Row */}
                 <div className="flex flex-col md:flex-row gap-3">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="e.g. GraphRAG, Agentic RAG, Qwen2.5-VL, LoRA fine-tuning..."
                     className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60"
                   />
-                  <button
-                    type="submit"
-                    disabled={isSearching || !searchQuery.trim()}
-                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 transition-all"
-                  >
+                  <button type="submit" disabled={isSearching || !searchQuery.trim()}
+                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 transition-all">
                     {isSearching ? "Searching arXiv..." : "🔍 Search arXiv"}
                   </button>
                 </div>
@@ -245,18 +282,40 @@ export default function Dashboard() {
             {searchResults.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-bold text-slate-200">arXiv Results</h2>
-                  <span className="text-xs text-slate-500">{searchResults.length} papers found</span>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-200">arXiv Results</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">{searchResults.length} papers · {searchResults.filter(r => ingestedPapers.some(p => p.arxiv_id === r.arxiv_id)).length} already in library</p>
+                  </div>
+                  <button
+                    onClick={handleIngestAll}
+                    disabled={isBatchIngesting || searchResults.every(r => ingestedPapers.some(p => p.arxiv_id === r.arxiv_id))}
+                    className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-semibold text-xs disabled:opacity-40 transition-all flex items-center gap-2"
+                  >
+                    {isBatchIngesting ? (
+                      <><span className="w-3 h-3 border-2 border-emerald-400/40 border-t-emerald-400 rounded-full animate-spin" /> Queuing...</>
+                    ) : (
+                      <>📥 Ingest All {searchResults.filter(r => !ingestedPapers.some(p => p.arxiv_id === r.arxiv_id)).length} New</>
+                    )}
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {searchResults.map((paper) => (
-                    <PaperCard
-                      key={paper.arxiv_id}
-                      paper={paper}
-                      onIngest={handleIngest}
-                      isIngesting={ingestingId === paper.arxiv_id}
-                    />
-                  ))}
+                  {searchResults.map((paper) => {
+                    const alreadyIn = ingestedPapers.some(p => p.arxiv_id === paper.arxiv_id);
+                    return (
+                      <div key={paper.arxiv_id} className="relative">
+                        {alreadyIn && (
+                          <div className="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold">
+                            ✓ In Library
+                          </div>
+                        )}
+                        <PaperCard
+                          paper={paper}
+                          onIngest={alreadyIn ? undefined : handleIngest}
+                          isIngesting={ingestingId === paper.arxiv_id}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -265,26 +324,18 @@ export default function Dashboard() {
             {ingestedPapers.length > 0 && (
               <div>
                 {!showLibrary ? (
-                  /* Collapsed indicator button */
-                  <button
-                    onClick={handleShowLibrary}
-                    className="w-full glass-panel rounded-2xl p-5 flex items-center justify-between hover:border-blue-500/30 transition-all group"
-                  >
+                  /* Collapsed indicator */
+                  <button onClick={handleShowLibrary}
+                    className="w-full glass-panel rounded-2xl p-5 flex items-center justify-between hover:border-blue-500/30 transition-all group">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600/30 to-indigo-600/30 border border-blue-500/20 flex items-center justify-center text-lg">
-                        📚
-                      </div>
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600/30 to-indigo-600/30 border border-blue-500/20 flex items-center justify-center text-lg">📚</div>
                       <div className="text-left">
-                        <p className="text-sm font-bold text-slate-200 group-hover:text-blue-300 transition-colors">
-                          Your Knowledge Base
-                        </p>
+                        <p className="text-sm font-bold text-slate-200 group-hover:text-blue-300 transition-colors">Your Knowledge Base</p>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {ingestedPapers.length} paper{ingestedPapers.length !== 1 ? "s" : ""} total ·{" "}
                           <span className="text-emerald-400">{completedPapers.length} ready</span>
                           {ingestedPapers.length - completedPapers.length > 0 && (
-                            <span className="text-amber-400 ml-1">
-                              · {ingestedPapers.length - completedPapers.length} processing
-                            </span>
+                            <span className="text-amber-400 ml-1">· {ingestedPapers.length - completedPapers.length} processing</span>
                           )}
                         </p>
                       </div>
@@ -297,38 +348,47 @@ export default function Dashboard() {
                 ) : (
                   /* Expanded library */
                   <div ref={libraryRef} className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <h2 className="text-base font-bold text-slate-200">Your Knowledge Base</h2>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Status updates automatically. Click 🗑 Remove to delete a paper from the library.
+                          {ingestedPapers.length} total · {completedPapers.length} ready
+                          {ingestedPapers.filter(p => p.status !== "done" && p.status !== "failed").length > 0 && (
+                            <span className="text-amber-400 ml-1">
+                              · {ingestedPapers.filter(p => p.status !== "done" && p.status !== "failed").length} processing
+                            </span>
+                          )}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-slate-500 bg-slate-900/60 px-2 py-1 rounded-lg border border-slate-800">
-                          {ingestedPapers.length} total · {completedPapers.length} ready
-                        </span>
-                        <button
-                          onClick={() => setShowLibrary(false)}
-                          className="text-xs text-slate-500 hover:text-slate-300 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-600 transition-colors"
-                        >
+                      <div className="flex items-center gap-2">
+                        <input type="text" value={libraryFilter} onChange={(e) => setLibraryFilter(e.target.value)}
+                          placeholder="Filter library..." className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/40 w-44" />
+                        <button onClick={() => setShowLibrary(false)}
+                          className="text-xs text-slate-500 hover:text-slate-300 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-600 transition-colors">
                           ↑ Collapse
                         </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {ingestedPapers.map((paper) => (
-                        <PaperCard
-                          key={paper.id}
-                          paper={paper}
-                          onRemove={handleRemovePaper}
-                        />
+                      {ingestedPapers
+                        .filter(p => !libraryFilter || p.title?.toLowerCase().includes(libraryFilter.toLowerCase()))
+                        .map((paper) => (
+                        <div key={paper.id} className="relative">
+                          {paper.status === "failed" && (
+                            <button onClick={() => handleRetry(paper.id)} disabled={retryingId === paper.id}
+                              className="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-bold transition-all">
+                              {retryingId === paper.id ? "⟳" : "🔁 Retry"}
+                            </button>
+                          )}
+                          <PaperCard paper={paper} onRemove={handleRemovePaper} />
+                        </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
+
             )}
 
             {/* Empty library — shown only if no papers at all */}
@@ -415,6 +475,19 @@ export default function Dashboard() {
           <ResearchTimeline papers={ingestedPapers} />
         )}
       </main>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border text-sm font-medium animate-in slide-in-from-bottom-4 duration-300 ${
+          toast.type === "success"
+            ? "bg-emerald-950/90 border-emerald-500/40 text-emerald-300"
+            : "bg-rose-950/90 border-rose-500/40 text-rose-300"
+        }`}>
+          <span>{toast.type === "success" ? "✅" : "❌"}</span>
+          <span>{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-slate-400 hover:text-white">✕</button>
+        </div>
+      )}
     </div>
   );
 }

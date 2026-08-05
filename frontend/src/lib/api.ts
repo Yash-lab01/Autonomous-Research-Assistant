@@ -139,15 +139,32 @@ export async function ingestPaper(paper: Partial<PaperSearchResult>): Promise<{ 
     ...(paper.arxiv_id ? { arxiv_id: paper.arxiv_id } : {}),
     ...(paper.title ? { title: paper.title } : {}),
     ...(paper.pdf_url ? { pdf_url: paper.pdf_url } : {}),
-    ...(paper.summary ? { summary: paper.summary } : {})
+    ...(paper.summary ? { summary: paper.summary } : {}),
   });
+  if (paper.authors?.length) {
+    paper.authors.forEach((a) => params.append("authors", a));
+  }
+  const res = await fetch(`${API_BASE_URL}/api/ingest?${params.toString()}`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 
-  const res = await fetch(`${API_BASE_URL}/api/ingest?${params.toString()}`, {
-    method: "POST"
+export async function ingestAllPapers(papers: Partial<PaperSearchResult>[]): Promise<{ queued: string[]; skipped: string[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/ingest/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ papers }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function retryPaper(paperId: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}/retry`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 export async function getPapers(): Promise<PaperItem[]> {
   const res = await fetch(`${API_BASE_URL}/api/papers`);

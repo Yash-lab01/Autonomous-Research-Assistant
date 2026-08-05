@@ -137,6 +137,83 @@ async def ingest_paper(
         "status": PaperStatus.QUEUED
     }
 
+
+class BatchIngestRequest(BaseModel):
+    papers: List[dict]  # Each item: {arxiv_id, title, authors, pdf_url, summary}
+
+@app.post("/api/ingest/batch")
+async def ingest_papers_batch(
+    req: BatchIngestRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Queues multiple papers for ingestion in one request.
+    Skips papers already in the library. Returns counts of queued vs skipped.
+    """
+    queued, skipped = [], []
+    for p in req.papers:
+        arxiv_id = p.get("arxiv_id")
+        if arxiv_id:
+            existing = DatabaseService.get_paper_by_arxiv_id(db, arxiv_id)
+            if existing:
+                skipped.append(arxiv_id)
+                continue
+
+        paper_id = f"paper_{uuid.uuid4().hex[:8]}"
+        paper_metadata = PaperMetadata(
+            id=paper_id,
+            arxiv_id=arxiv_id,
+            title=p.get("title") or f"arXiv Paper {arxiv_id}",
+            authors=p.get("authors") or [],
+            pdf_url=p.get("pdf_url"),
+            summary=p.get("summary"),
+            status=PaperStatus.QUEUED
+        )
+        DatabaseService.create_paper(db, paper_metadata)
+        background_tasks.add_task(
+            IngestionPipeline.process_paper_async,
+            paper_id=paper_id,
+            arxiv_id=arxiv_id,
+            pdf_url=p.get("pdf_url")
+        )
+        queued.append(arxiv_id or paper_id)
+
+    return {
+        "message": f"Queued {len(queued)} papers, skipped {len(skipped)} already in library.",
+        "queued": queued,
+        "skipped": skipped
+    }
+
+
+@app.post("/api/papers/{paper_id}/retry")
+async def retry_failed_paper(
+    paper_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Retries ingestion for a paper that has status 'failed'.
+    Resets status to 'queued' and re-triggers the ingestion pipeline.
+    """
+    paper = DatabaseService.get_paper_by_id(db, paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    status_val = paper.status.value if hasattr(paper.status, 'value') else paper.status
+    if status_val != "failed":
+        raise HTTPException(status_code=400, detail=f"Paper is not in failed state (current: {status_val})")
+
+    # Reset status
+    DatabaseService.update_paper_status(db, paper_id, PaperStatus.QUEUED, failure_reason=None)
+    background_tasks.add_task(
+        IngestionPipeline.process_paper_async,
+        paper_id=paper_id,
+        arxiv_id=paper.arxiv_id,
+        pdf_url=paper.pdf_url
+    )
+    return {"message": "Paper re-queued for retry.", "paper_id": paper_id}
+
+
 @app.get("/api/papers")
 def list_papers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
