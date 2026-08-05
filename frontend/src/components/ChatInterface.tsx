@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { sendChatQuery, ChatResponse, CitationItem, PaperItem } from "@/lib/api";
+import React, { useState, useEffect, useRef } from "react";
+import { ChatResponse, CitationItem, PaperItem } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const CHAT_STORAGE_KEY = "ai_research_os_chat_history";
+
 
 interface ChatInterfaceProps {
   papers: PaperItem[];
@@ -13,14 +17,20 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
   const [selectedPaperIds, setSelectedPaperIds] = useState<string[]>([]);
   const [messages, setMessages] = useState<
     { role: "user" | "assistant"; content: string; citations?: CitationItem[]; stepLogs?: string[] }[]
-  >([
-    {
-      role: "assistant",
-      content: "Hello! I am your AI Research Assistant. Ask me any question across your ingested papers or request comparisons, method breakdowns, and literature surveys."
+  >(() => {
+    // Restore from localStorage on first render
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch {}
     }
-  ]);
+    return [{ role: "assistant", content: "Hello! I am your AI Research Assistant. Ask me any question across your ingested papers or request comparisons, method breakdowns, and literature surveys." }];
+  });
   const [loading, setLoading] = useState(false);
+  const [liveStep, setLiveStep] = useState<string | null>(null);
   const [activeCitation, setActiveCitation] = useState<CitationItem | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Voice Research Mode states
   const [isListening, setIsListening] = useState(false);
@@ -90,6 +100,18 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
     window.speechSynthesis.speak(utterance);
   };
 
+  // Persist chat to localStorage on every message change
+  useEffect(() => {
+    if (typeof window !== "undefined" && messages.length > 0) {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-30))); // keep last 30 messages
+    }
+  }, [messages]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, liveStep]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim() || loading) return;
@@ -98,25 +120,62 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
     setQuery("");
     setMessages(prev => [...prev, { role: "user", content: userText }]);
     setLoading(true);
+    setLiveStep("🧠 Planning your query...");
 
     try {
-      const res: ChatResponse = await sendChatQuery(userText, selectedPaperIds);
-      const newIndex = messages.length + 1;
-      setMessages(prev => [
-        ...prev,
-        {
-          role: "assistant",
-          content: res.response,
-          citations: res.citations,
-          stepLogs: res.step_logs
-        }
-      ]);
+      // Use SSE streaming endpoint for live step-log feedback
+      const res = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: userText, paper_ids: selectedPaperIds.length ? selectedPaperIds : null }),
+      });
 
-      // Auto-speak response if voice mode enabled
-      if (voiceEnabled && "speechSynthesis" in window) {
-        speakText(res.response, newIndex);
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const dataLine = line.startsWith("data: ") ? line.slice(6) : null;
+          if (!dataLine) continue;
+          try {
+            const event = JSON.parse(dataLine);
+            if (event.type === "step") {
+              setLiveStep(event.data);
+            } else if (event.type === "done") {
+              const newIndex = messages.length + 1;
+              setMessages(prev => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: event.response,
+                  citations: event.citations,
+                  stepLogs: event.step_logs
+                }
+              ]);
+              setLiveStep(null);
+              if (voiceEnabled && "speechSynthesis" in window) {
+                speakText(event.response, newIndex);
+              }
+            } else if (event.type === "error") {
+              throw new Error(event.data);
+            }
+          } catch (parseErr) {
+            // Skip malformed SSE lines
+          }
+        }
       }
     } catch (err: any) {
+      setLiveStep(null);
       setMessages(prev => [
         ...prev,
         {
@@ -126,6 +185,7 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
       ]);
     } finally {
       setLoading(false);
+      setLiveStep(null);
     }
   };
 
@@ -147,6 +207,20 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Clear Chat */}
+          <button
+            type="button"
+            onClick={() => {
+              const initial = [{ role: "assistant" as const, content: "Hello! I am your AI Research Assistant. Ask me any question across your ingested papers or request comparisons, method breakdowns, and literature surveys." }];
+              setMessages(initial);
+              localStorage.removeItem(CHAT_STORAGE_KEY);
+            }}
+            className="text-xs px-2.5 py-1 rounded-lg border bg-slate-800/60 text-slate-500 border-slate-700 hover:text-rose-300 hover:border-rose-500/40 transition-all"
+            title="Clear chat history"
+          >
+            🗑️ Clear
+          </button>
+
           {/* Voice Output Toggle */}
           <button
             type="button"
@@ -247,12 +321,20 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
           </div>
         ))}
 
-        {loading && (
-          <div className="flex items-center gap-3 text-slate-400 text-xs font-mono p-4 glass-panel rounded-xl max-w-sm">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping"></span>
-            LangGraph orchestrator reasoning...
+        {(loading || liveStep) && (
+          <div className="flex items-start gap-3 p-4 glass-panel rounded-xl max-w-md">
+            <div className="flex flex-col gap-1.5 pt-0.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-blue-300">Agent Running</span>
+              <span className="text-xs font-mono text-slate-400 leading-relaxed">
+                {liveStep || "🧠 Planning your query..."}
+              </span>
+            </div>
           </div>
         )}
+        <div ref={scrollRef} />
       </div>
 
       {/* Input Form with Push-to-Talk Mic */}

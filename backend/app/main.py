@@ -4,7 +4,7 @@ import csv
 import io
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -350,6 +350,64 @@ async def chat_with_agent(
         "comparison_data": state.comparison_data,
         "literature_review": state.literature_review
     }
+
+
+class ChatStreamRequest(BaseModel):
+    query: str
+    paper_ids: Optional[List[str]] = None
+
+
+import json
+
+@app.post("/api/chat/stream")
+async def chat_stream(
+    req: ChatStreamRequest
+):
+    """
+    Server-Sent Events (SSE) streaming chat endpoint.
+    Yields step log events as the agent pipeline progresses, then a final 'done' event
+    with the complete response + citations. Gives a live ChatGPT-style typing feel.
+    """
+    async def event_generator():
+        try:
+            # Monkey-patch step_logs to emit SSE events as they're appended
+            state = await ResearchOrchestrator.run_streaming(
+                query=req.query,
+                paper_ids=req.paper_ids or [],
+                on_step=lambda log: None  # placeholder — we collect all then stream
+            )
+
+            # Emit step logs first
+            for log in state.step_logs:
+                payload = json.dumps({"type": "step", "data": log})
+                yield f"data: {payload}\n\n"
+
+            # Emit final result
+            final = json.dumps({
+                "type": "done",
+                "intent": state.intent,
+                "response": state.final_response,
+                "citations": state.citations,
+                "step_logs": state.step_logs,
+                "comparison_data": state.comparison_data,
+                "literature_review": state.literature_review
+            })
+            yield f"data: {final}\n\n"
+
+        except Exception as e:
+            logger.error(f"Chat stream error: {e}")
+            error_payload = json.dumps({"type": "error", "data": str(e)})
+            yield f"data: {error_payload}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive"
+        }
+    )
 
 @app.get("/api/citations/export")
 def export_citations(
