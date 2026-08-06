@@ -251,3 +251,12 @@ export async function fetchVisionStatus(): Promise<{ available: boolean; model: 
   if (!res.ok) return { available: false, model: "unknown" };
   return res.json();
 }
+
+export async function fetchSimilarPapers(paperId: string, topK: number = 3): Promise<{
+  paper_id: string;
+  similar: { paper_id: string; title: string; arxiv_id: string; score: number }[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}/similar?top_k=${topK}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

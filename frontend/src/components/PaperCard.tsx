@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperSearchResult, PaperItem, updatePaperNotes, fetchPaperFigures, PaperFigure } from "@/lib/api";
+import { PaperSearchResult, PaperItem, updatePaperNotes, fetchPaperFigures, fetchSimilarPapers, PaperFigure } from "@/lib/api";
 
 interface PaperCardProps {
   paper: PaperSearchResult | PaperItem;
@@ -32,6 +32,11 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
   const [tagsList, setTagsList] = useState<string[]>(initialTags);
   const [savingNotes, setSavingNotes] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Similar papers state
+  const [showSimilar, setShowSimilar] = useState(false);
+  const [similarPapers, setSimilarPapers] = useState<{ paper_id: string; title: string; arxiv_id: string; score: number }[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
 
   const getStatusBadge = () => {
     if (!status) return null;
@@ -96,6 +101,22 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
       }
     }
     setShowFigures(!showFigures);
+  };
+
+  const handleFindSimilar = async () => {
+    if (!paperId) return;
+    if (showSimilar) { setShowSimilar(false); return; }
+    setShowSimilar(true);
+    if (similarPapers.length > 0) return; // already loaded
+    setLoadingSimilar(true);
+    try {
+      const res = await fetchSimilarPapers(paperId, 3);
+      setSimilarPapers(res.similar);
+    } catch (err) {
+      console.error("Similar papers error:", err);
+    } finally {
+      setLoadingSimilar(false);
+    }
   };
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -165,6 +186,13 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
                 className="text-xs font-medium text-slate-400 hover:text-purple-400 flex items-center gap-1.5 transition-colors"
               >
                 <span>{showFigures ? "▲ Hide Diagrams" : "🖼️ Figures"}</span>
+              </button>
+
+              <button
+                onClick={handleFindSimilar}
+                className="text-xs font-medium text-slate-400 hover:text-amber-400 flex items-center gap-1.5 transition-colors"
+              >
+                <span>{showSimilar ? "▲ Hide Similar" : "🔎 Find Similar"}</span>
               </button>
             </div>
 
@@ -253,6 +281,34 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
                           <span className="text-[9px] text-slate-400 font-mono ml-1">p.{fig.page_number}</span>
                         </div>
                       </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Similar Papers Drawer */}
+            {showSimilar && (
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/30 space-y-2">
+                <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider block">
+                  🔎 Similar Papers in Library
+                </span>
+                {loadingSimilar ? (
+                  <div className="text-xs text-slate-500 py-2 text-center animate-pulse">Finding similar papers...</div>
+                ) : similarPapers.length === 0 ? (
+                  <div className="text-xs text-slate-500 py-2 text-center">No similar papers found in your library yet.</div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {similarPapers.map((sp) => (
+                      <div key={sp.paper_id} className="flex items-start justify-between gap-2 p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-slate-200 font-medium line-clamp-2 leading-snug">{sp.title}</p>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">arXiv:{sp.arxiv_id}</p>
+                        </div>
+                        <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                          {Math.round(sp.score * 100)}%
+                        </span>
+                      </div>
                     ))}
                   </div>
                 )}

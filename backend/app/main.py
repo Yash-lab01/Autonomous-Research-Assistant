@@ -333,6 +333,53 @@ def delete_paper(paper_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Paper not found")
     return {"message": "Paper deleted successfully.", "paper_id": paper_id}
 
+
+@app.get("/api/papers/{paper_id}/similar")
+def find_similar_papers(
+    paper_id: str,
+    top_k: int = 3,
+    db: Session = Depends(get_db)
+):
+    """
+    Finds the top-K most semantically similar papers already in the library.
+    Uses the Qdrant vector index — zero extra computation since embeddings already exist.
+    """
+    from app.services.vector_store import vector_store
+
+    paper = DatabaseService.get_paper_by_id(db, paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    query_text = (paper.summary or paper.title or "").strip()
+    if not query_text:
+        return {"paper_id": paper_id, "similar": []}
+
+    try:
+        # Fetch more results so we can aggregate across unique papers
+        raw = vector_store.search_paragraphs(query_text, top_k=top_k * 8)
+
+        seen, similar = set(), []
+        for r in raw:
+            pid = r.get("paper_id", "")
+            if pid and pid != paper_id and pid not in seen:
+                seen.add(pid)
+                other = DatabaseService.get_paper_by_id(db, pid)
+                if other:
+                    similar.append({
+                        "paper_id": pid,
+                        "title": other.title,
+                        "arxiv_id": other.arxiv_id,
+                        "score": round(float(r.get("score", 0.0)), 3)
+                    })
+                if len(similar) >= top_k:
+                    break
+
+        return {"paper_id": paper_id, "similar": similar}
+
+    except Exception as e:
+        logger.warning(f"Similar papers search failed for {paper_id}: {e}")
+        return {"paper_id": paper_id, "similar": [], "error": str(e)}
+
 @app.post("/api/chat")
 async def chat_with_agent(
     query: str,
