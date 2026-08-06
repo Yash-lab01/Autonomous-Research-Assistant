@@ -357,8 +357,14 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder={isListening ? "Listening to your voice..." : "Ask a technical question, compare datasets, or generate literature review..."}
+          placeholder={isListening ? "Listening to your voice..." : "Ask a question, compare datasets, or generate a literature review... (Ctrl+Enter to send)"}
           className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60"
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              if (!loading && query.trim()) handleSubmit(e as any);
+            }
+          }}
         />
 
         <button
