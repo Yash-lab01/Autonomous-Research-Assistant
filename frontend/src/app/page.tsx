@@ -71,11 +71,25 @@ export default function Dashboard() {
     }
   };
 
+  // Keep a ref to the latest ingestedPapers so the interval can read it without re-registering
+  const ingestedPapersRef = useRef(ingestedPapers);
+  useEffect(() => { ingestedPapersRef.current = ingestedPapers; }, [ingestedPapers]);
+
+  const ACTIVE_STATUSES = new Set(["queued", "downloading", "parsing", "extracting", "embedding"]);
+
   useEffect(() => {
-    fetchIngestedPapers();
-    // Poll paper statuses every 4 seconds to reflect live ingestion progression (queued → parsing → done)
-    const interval = setInterval(fetchIngestedPapers, 4000);
+    fetchIngestedPapers(); // initial load on mount
+
+    // Smart poll: only hits the API when at least one paper is actively processing
+    const interval = setInterval(() => {
+      const hasActive = ingestedPapersRef.current.some(p => ACTIVE_STATUSES.has(p.status));
+      if (hasActive) {
+        fetchIngestedPapers();
+      }
+    }, 4000);
+
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
