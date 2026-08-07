@@ -59,6 +59,17 @@
 
 ---
 
+## ✅ Phase 3 — Figure-First Intelligence & Richer Outputs (COMPLETE)
+
+| Feature | File(s) | Notes |
+|---------|---------|-------|
+| P3.4 Figures in Literature Review | `LiteratureDraft.tsx` | Embed supporting figure diagrams + export to Markdown |
+| P3.3 Figures + Prose Mode in Compare | `ComparisonTable.tsx`, `writing.py`, `main.py` | `POST /api/compare/prose`; Table vs Prose toggle + figure strip |
+| P3.1 Figure-Aware RAG in Chat | `reading.py`, `state.py`, `db.py`, `ChatInterface.tsx` | Page-level figure matching on cited RAG pages + preview modal |
+| P3.2 Deep Paper Summary Tab | `PaperSummary.tsx`, `writing.py`, `main.py`, `Navbar.tsx` | Single-paper deep technical breakdown + combined multi-paper summary |
+
+---
+
 ## 🔧 Phase 3 — Figure-First Intelligence + Richer Outputs
 
 > **Build order:** P3.4 → P3.3 → P3.1 → P3.2 (lowest → highest effort, each builds on previous)
