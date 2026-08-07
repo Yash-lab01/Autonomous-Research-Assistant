@@ -41,7 +41,8 @@ class LLMFactory:
                     temperature=temperature
                 )
             except Exception as e:
-                logger.warning(f"Groq API call failed ({e}). Falling back to local Ollama...")
+                err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+                logger.warning(f"Groq API call failed ({err_msg}). Falling back to local Ollama...")
                 # Fallthrough to Ollama
 
         # Default or Fallback: Call local Ollama
@@ -55,7 +56,8 @@ class LLMFactory:
                 temperature=temperature
             )
         except Exception as e:
-            logger.error(f"Local Ollama call failed ({e}).")
+            err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            logger.error(f"Local Ollama call failed ({err_msg}).")
             # If Groq is available as secondary fallback for bulk, try it
             if workload_type == "bulk" and groq_api_key:
                 try:
@@ -69,9 +71,10 @@ class LLMFactory:
                         temperature=temperature
                     )
                 except Exception as groq_err:
-                    raise RuntimeError(f"Both Ollama and Groq LLM calls failed: Ollama ({e}), Groq ({groq_err})")
+                    g_msg = f"{type(groq_err).__name__}: {groq_err}" if str(groq_err) else type(groq_err).__name__
+                    raise RuntimeError(f"Both Ollama and Groq LLM calls failed: Ollama ({err_msg}), Groq ({g_msg})")
             
-            raise RuntimeError(f"LLM execution failed: {e}. Ensure Ollama is running at {settings.OLLAMA_BASE_URL} or supply a valid GROQ_API_KEY.")
+            raise RuntimeError(f"LLM execution failed: {err_msg}. Ensure Ollama is running at {settings.OLLAMA_BASE_URL} or supply a valid GROQ_API_KEY.")
 
     @staticmethod
     async def _call_groq(
@@ -99,7 +102,7 @@ class LLMFactory:
         if response_format == "json_object":
             payload["response_format"] = {"type": "json_object"}
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             res = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
             if res.status_code == 429:
                 raise Exception("Groq 429 Rate Limit Exceeded")
@@ -130,7 +133,7 @@ class LLMFactory:
         if response_format == "json_object":
             payload["format"] = "json"
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             res = await client.post(url, json=payload)
             res.raise_for_status()
             data = res.json()
