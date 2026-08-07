@@ -15,6 +15,7 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
   const [customTopic, setCustomTopic] = useState("");
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [mode, setMode] = useState<"single" | "combined" | null>(null);
 
   const [allFigures, setAllFigures] = useState<{ paperTitle: string; figure: PaperFigure }[]>([]);
@@ -22,6 +23,29 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
   const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; paperTitle: string; pageNumber: number } | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  // Live timer during summary generation
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (generating) {
+      setElapsedSeconds(0);
+      timer = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [generating]);
+
+  const formatTime = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
@@ -232,7 +256,7 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
                 disabled={generating}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg shadow-blue-600/25 disabled:opacity-50 transition-all flex items-center gap-2"
               >
-                <span>📄</span> {generating ? "Generating Technical Breakdown..." : "Summarise Selected Paper"}
+                <span>📄</span> {generating ? `Generating Breakdown... (${formatTime(elapsedSeconds)})` : "Summarise Selected Paper"}
               </button>
             )}
 
@@ -250,7 +274,7 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
                   disabled={generating}
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-xs shadow-lg shadow-purple-600/25 disabled:opacity-50 transition-all flex items-center gap-2"
                 >
-                  <span>📋</span> {generating ? "Synthesizing Multi-Paper Summary..." : `Generate Synthesis (${selectedPapers.length} Papers)`}
+                  <span>📋</span> {generating ? `Synthesizing Multi-Paper Summary... (${formatTime(elapsedSeconds)})` : `Generate Synthesis (${selectedPapers.length} Papers)`}
                 </button>
               </>
             )}
@@ -263,6 +287,32 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
           </div>
         </div>
       </div>
+
+      {/* Live Generating Progress Card with Timer */}
+      {generating && (
+        <div className="glass-panel rounded-2xl p-6 border border-purple-500/40 bg-gradient-to-r from-slate-950 via-purple-950/20 to-slate-950 flex items-center justify-between gap-4 shadow-2xl relative overflow-hidden animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
+              <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>{mode === "single" ? "📄 Deep Per-Paper Technical Breakdown" : "📋 Multi-Paper Synthesis Summary"}</span>
+                <span className="text-[10px] font-mono text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/30">
+                  Groq 70B
+                </span>
+              </p>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Analyzing architecture, benchmark metrics, limitations & extracting visual diagrams...
+              </p>
+            </div>
+          </div>
+          <div className="px-4 py-2 rounded-xl bg-purple-950/80 border border-purple-500/50 text-purple-300 font-mono text-sm font-bold flex items-center gap-2 shadow-lg shadow-purple-500/10 shrink-0">
+            <span>⏱️</span>
+            <span>{formatTime(elapsedSeconds)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Summary Output View */}
       {summaryContent && (
