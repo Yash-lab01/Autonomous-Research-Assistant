@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { exportCitations, PaperItem } from "@/lib/api";
+import { exportCitations, fetchPaperFigures, PaperItem, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface LiteratureDraftProps {
@@ -140,6 +140,14 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
   const [hoveredFormat, setHoveredFormat] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [allFigures, setAllFigures] = useState<{ paperTitle: string; paperArxivId?: string; figure: PaperFigure }[]>([]);
+  const [selectedFigureIds, setSelectedFigureIds] = useState<Set<string>>(new Set());
+  const [showFiguresPanel, setShowFiguresPanel] = useState(true);
+  const [loadingFigures, setLoadingFigures] = useState(false);
+  const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; paperTitle: string; pageNumber: number } | null>(null);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
@@ -150,11 +158,22 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
     ? completedPapers.filter((p) => selectedIds.includes(p.id))
     : [];
 
+  const toggleFigureSelection = (figKey: string) => {
+    setSelectedFigureIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(figKey)) next.delete(figKey);
+      else next.add(figKey);
+      return next;
+    });
+  };
+
   const handleGenerateReview = async () => {
     if (!topic.trim() || selectedPapers.length === 0) return;
     setGenerating(true);
     setReviewContent(null);
     setCitationOutput(null);
+    setAllFigures([]);
+    setSelectedFigureIds(new Set());
 
     try {
       // Build query params — pass selected paper IDs to backend
@@ -163,7 +182,7 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
       });
       selectedIds.forEach(id => params.append("paper_ids", id));
 
-      const res = await fetch(`http://localhost:8000/api/chat?${params.toString()}`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/api/chat?${params.toString()}`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setReviewContent(data.response);
@@ -171,10 +190,35 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
       // Fetch citations for selected papers in chosen format
       const bib = await exportCitations(selectedIds, citationFormat);
       setCitationOutput(bib.content);
+
+      // Fetch figures for all selected papers
+      setLoadingFigures(true);
+      const figsList: { paperTitle: string; paperArxivId?: string; figure: PaperFigure }[] = [];
+      const defaultSelected = new Set<string>();
+
+      await Promise.all(
+        selectedPapers.map(async (paper) => {
+          try {
+            const figRes = await fetchPaperFigures(paper.id);
+            if (figRes.figures) {
+              figRes.figures.forEach((fig) => {
+                const key = `${paper.id}_${fig.figure_id}`;
+                figsList.push({ paperTitle: paper.title, paperArxivId: paper.arxiv_id, figure: fig });
+                defaultSelected.add(key); // select by default for export
+              });
+            }
+          } catch (err) {
+            console.error(`Failed to fetch figures for ${paper.id}`, err);
+          }
+        })
+      );
+      setAllFigures(figsList);
+      setSelectedFigureIds(defaultSelected);
     } catch (e: any) {
       setReviewContent(`⚠️ Error generating review: ${e.message || e}`);
     } finally {
       setGenerating(false);
+      setLoadingFigures(false);
     }
   };
 
@@ -188,7 +232,23 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
 
   const handleDownloadMarkdown = () => {
     if (!reviewContent) return;
-    const fullMd = `# ${topic}\n\n${reviewContent}\n\n${citationOutput ? `## References (${citationFormat.toUpperCase()})\n\n${citationOutput}` : ""}`;
+
+    // Filter selected figures for markdown inclusion
+    const chosenFigs = allFigures.filter((item) =>
+      selectedFigureIds.has(`${item.figure.figure_id}`) ||
+      selectedFigureIds.has(`${item.paperTitle}_${item.figure.figure_id}`)
+    );
+
+    let figuresMd = "";
+    if (chosenFigs.length > 0) {
+      figuresMd = `\n\n## Visual Supporting Evidence & Figures\n\n` +
+        chosenFigs.map((item) => {
+          const imgUrl = item.figure.url.startsWith("http") ? item.figure.url : `${API_BASE}${item.figure.url}`;
+          return `![${item.figure.caption || `Figure from ${item.paperTitle}`}](${imgUrl})\n*Figure (p. ${item.figure.page_number}) from ${item.paperTitle}: ${item.figure.caption || "Diagram/Plot"}*\n`;
+        }).join("\n");
+    }
+
+    const fullMd = `# ${topic}\n\n${reviewContent}${figuresMd}\n\n${citationOutput ? `## References (${citationFormat.toUpperCase()})\n\n${citationOutput}` : ""}`;
     const blob = new Blob([fullMd], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -393,6 +453,83 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
             <MarkdownRenderer content={reviewContent} />
           </div>
 
+          {/* Supporting Figures & Diagrams Panel */}
+          {allFigures.length > 0 && (
+            <div className="mx-8 mb-6 rounded-2xl border border-purple-500/30 overflow-hidden bg-slate-950/40">
+              <div className="flex items-center justify-between bg-purple-950/30 px-5 py-3 border-b border-purple-500/30">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-purple-300">
+                    🖼️ Supporting Figures & Diagrams ({allFigures.length})
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    · Check items to embed in Markdown export
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowFiguresPanel(!showFiguresPanel)}
+                  className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-900 border border-slate-800"
+                >
+                  {showFiguresPanel ? "▲ Hide" : "▼ Show"}
+                </button>
+              </div>
+
+              {showFiguresPanel && (
+                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {allFigures.map((item, idx) => {
+                    const key = `${item.paperTitle}_${item.figure.figure_id}`;
+                    const isChecked = selectedFigureIds.has(key) || selectedFigureIds.has(item.figure.figure_id);
+                    return (
+                      <div
+                        key={idx}
+                        className={`group relative rounded-xl border overflow-hidden p-3 flex flex-col justify-between transition-all ${
+                          isChecked ? "bg-slate-900 border-purple-500/50 shadow-md shadow-purple-500/10" : "bg-slate-950/80 border-slate-800 opacity-75"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300 truncate pr-2">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleFigureSelection(key)}
+                                className="rounded border-slate-700 bg-slate-900 text-purple-600 focus:ring-purple-500"
+                              />
+                              <span className="truncate">{item.paperTitle}</span>
+                            </label>
+                            <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 shrink-0">
+                              p. {item.figure.page_number}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => setActiveLightboxFig({
+                              url: `${API_BASE}${item.figure.url}`,
+                              caption: item.figure.caption,
+                              paperTitle: item.paperTitle,
+                              pageNumber: item.figure.page_number
+                            })}
+                            className="w-full aspect-video rounded-lg overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center mb-2 group-hover:border-purple-400 transition-colors"
+                          >
+                            <img
+                              src={`${API_BASE}${item.figure.url}`}
+                              alt={item.figure.caption}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                          </button>
+
+                          <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                            {item.figure.ai_captioned && <span className="text-emerald-400 font-semibold mr-1">🤖 AI</span>}
+                            {item.figure.caption}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Citation Export Block */}
           {citationOutput && (
             <div className="mx-8 mb-8 rounded-2xl border border-slate-700/60 overflow-hidden">
@@ -419,6 +556,37 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
               </pre>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Lightbox Modal for Figures */}
+      {activeLightboxFig && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="glass-panel-glow max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="font-bold text-slate-100">{activeLightboxFig.paperTitle}</h4>
+                <p className="text-xs text-slate-400 font-mono">Page {activeLightboxFig.pageNumber}</p>
+              </div>
+              <button
+                onClick={() => setActiveLightboxFig(null)}
+                className="text-slate-400 hover:text-white px-3 py-1 rounded-lg bg-slate-800 text-xs font-medium"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <img
+                src={activeLightboxFig.url}
+                alt={activeLightboxFig.caption}
+                className="max-h-[60vh] object-contain rounded-lg"
+              />
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              <span className="font-semibold text-purple-400 block mb-1">Figure Caption / AI Analysis</span>
+              {activeLightboxFig.caption}
+            </div>
+          </div>
         </div>
       )}
     </div>
