@@ -238,3 +238,128 @@ Write the full literature review draft now, following all formatting rules stric
         }
         state.final_response = review_text
         return state
+
+    @staticmethod
+    async def generate_paper_summary(paper_id: str) -> str:
+        """
+        Generates a deep technical per-paper summary including architecture, methodology, results, and limitations.
+        """
+        db: Session = SessionLocal()
+        paper = DatabaseService.get_paper_by_id(db, paper_id)
+        paragraphs = DatabaseService.get_paragraphs_by_paper(db, paper_id)
+        figures = DatabaseService.get_figures_by_pages(db, paper_id, list(range(1, 30)))
+        db.close()
+
+        if not paper:
+            return "Paper not found."
+
+        sd = paper.structured_data or {}
+        top_paragraphs = "\n\n".join([f"[p. {p.page_number}] {p.text}" for p in paragraphs[:10]])
+        fig_captions = "\n".join([f"- [Fig p.{f.page_number}] {f.caption}" for f in figures[:6]]) or "No figures extracted."
+
+        PAPER_SUMMARY_PROMPT = f"""You are a senior AI research scientist. Write a deep, highly technical per-paper summary for the following research paper.
+
+PAPER METADATA:
+Title: {paper.title}
+Authors: {", ".join(paper.authors or [])}
+arXiv ID: {paper.arxiv_id or paper.id}
+Abstract: {paper.summary or 'N/A'}
+
+EXTRACTED STRUCTURED DATA:
+Primary Task: {sd.get('primary_task', 'N/A')}
+Backbone Models: {', '.join(sd.get('backbone_models', []))}
+Datasets: {', '.join(sd.get('datasets_used', []))}
+Benchmark Metrics: {sd.get('benchmark_metrics', {})}
+Limitations: {'; '.join(sd.get('limitations', []))}
+Future Work: {'; '.join(sd.get('future_work', []))}
+
+AVAILABLE FIGURES/DIAGRAMS:
+{fig_captions}
+
+KEY PARAGRAPHS:
+{top_paragraphs}
+
+STRICT OUTPUT FORMAT:
+## {paper.title}
+**Authors:** {", ".join(paper.authors or [])} | **arXiv:** {paper.arxiv_id or paper.id}
+
+### 🎯 Core Innovation & Contribution
+Write 2-3 technical paragraphs highlighting the core problem, proposed novel solution, and key contributions.
+
+### 🏗️ Technical Architecture & Methodology
+Write 2-3 dense paragraphs detailing the system pipeline, loss functions, algorithms, and models used. Reference figures where relevant (e.g. "As shown in [Fig p.X]...").
+
+### 📊 Empirical Results & Benchmarks
+Write 1-2 paragraphs analyzing performance metrics, baseline comparisons, and evaluation datasets.
+
+### ⚠️ Limitations & Failure Modes
+Write 1-2 paragraphs detailing practical constraints, scalability limits, or edge-case failures.
+
+### 💡 Takeaways for Researchers
+Write 3-5 concise bullet points summarizing why this paper matters and when to cite it.
+"""
+
+        response = await LLMFactory.invoke_llm(
+            prompt=PAPER_SUMMARY_PROMPT,
+            system_prompt="You are an expert AI research scientist producing dense, rigorous per-paper technical summaries.",
+            workload_type="interactive",
+            temperature=0.2
+        )
+        return response
+
+    @staticmethod
+    async def generate_combined_summary(paper_ids: List[str], topic: Optional[str] = None) -> str:
+        """
+        Generates a multi-paper synthesis summary.
+        """
+        db: Session = SessionLocal()
+        all_papers = DatabaseService.list_papers(db)
+        db.close()
+
+        papers = [p for p in all_papers if p.id in paper_ids] if paper_ids else all_papers[:6]
+        if not papers:
+            return "No papers selected for combined summary."
+
+        topic_str = topic or "Multi-Paper Research Focus"
+        paper_blocks = []
+        for p in papers:
+            sd = p.structured_data or {}
+            paper_blocks.append(
+                f"Title: {p.title}\n"
+                f"Abstract: {p.summary or 'N/A'}\n"
+                f"Task: {sd.get('primary_task', 'N/A')}\n"
+                f"Methodology: {sd.get('methodology_summary', 'N/A')}\n"
+                f"Datasets: {', '.join(sd.get('datasets_used', []))}\n"
+                f"Limitations: {'; '.join(sd.get('limitations', []))}"
+            )
+
+        combined_input = "\n\n---\n\n".join(paper_blocks)
+
+        COMBINED_SUMMARY_PROMPT = f"""Write a multi-paper synthesis summary covering the following {len(papers)} research papers on topic: '{topic_str}'.
+
+PAPER SOURCES:
+{combined_input}
+
+STRICT OUTPUT FORMAT:
+## Combined Research Summary: {topic_str}
+
+### 🌐 High-Level Technical Landscape
+Write 2-3 paragraphs synthesizing the current state of research across these papers.
+
+### 🔬 Methodological Approaches Compared
+Write 2-3 paragraphs comparing models, architectures, and algorithms across the papers.
+
+### 📈 Empirical Results & Benchmark Highlights
+Write 2 paragraphs highlighting key performance metrics and evaluation outcomes.
+
+### 🔗 Synergies & Unresolved Research Gaps
+Write 2 paragraphs identifying shared limitations and opportunities for combined research.
+"""
+
+        response = await LLMFactory.invoke_llm(
+            prompt=COMBINED_SUMMARY_PROMPT,
+            system_prompt="You are an expert AI research scientist synthesizing multi-paper technical summaries.",
+            workload_type="interactive",
+            temperature=0.25
+        )
+        return response

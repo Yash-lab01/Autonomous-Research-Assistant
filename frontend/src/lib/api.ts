@@ -271,3 +271,23 @@ export async function fetchProseComparison(paperIds?: string[]): Promise<{ prose
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function fetchSinglePaperSummary(paperId: string): Promise<{ paper_id: string; summary: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/summary/paper`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paper_id: paperId }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchCombinedSummary(paperIds: string[], topic?: string): Promise<{ summary: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/summary/combined`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paper_ids: paperIds, topic: topic || null }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

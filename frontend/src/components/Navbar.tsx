@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 
 interface NavbarProps {
-  activeTab: "discovery" | "chat" | "compare" | "review" | "gaps" | "timeline";
-  setActiveTab: (tab: "discovery" | "chat" | "compare" | "review" | "gaps" | "timeline") => void;
+  activeTab: "discovery" | "chat" | "compare" | "summary" | "review" | "gaps" | "timeline";
+  setActiveTab: (tab: "discovery" | "chat" | "compare" | "summary" | "review" | "gaps" | "timeline") => void;
   ingestedCount: number;
 }
 
 const TABS: {
-  id: "discovery" | "chat" | "compare" | "review" | "gaps" | "timeline";
+  id: "discovery" | "chat" | "compare" | "summary" | "review" | "gaps" | "timeline";
   icon: string;
   label: string;
   shortLabel: string;
@@ -41,28 +41,36 @@ const TABS: {
     step: 3,
   },
   {
+    id: "summary",
+    icon: "📑",
+    label: "Paper Summary",
+    shortLabel: "Summary",
+    hint: "Step 4 — Per-paper deep summary or multi-paper synthesis",
+    step: 4,
+  },
+  {
     id: "review",
     icon: "📝",
     label: "Literature Review",
     shortLabel: "Review",
-    hint: "Step 4 — Auto-generate a survey draft with citations",
-    step: 4,
+    hint: "Step 5 — Auto-generate a survey draft with citations",
+    step: 5,
   },
   {
     id: "gaps",
     icon: "⚡",
     label: "Research Gaps",
     shortLabel: "Gaps",
-    hint: "Step 5 — Discover open problems & novel thesis ideas",
-    step: 5,
+    hint: "Step 6 — Discover open problems & novel thesis ideas",
+    step: 6,
   },
   {
     id: "timeline",
     icon: "🗓️",
     label: "Field Evolution",
     shortLabel: "Timeline",
-    hint: "Step 6 — Chronological timeline of tasks, models & benchmarks",
-    step: 6,
+    hint: "Step 7 — Chronological timeline of tasks, models & benchmarks",
+    step: 7,
   },
 ];
 

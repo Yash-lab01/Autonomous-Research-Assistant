@@ -303,6 +303,31 @@ async def generate_prose_comparison(req: ProseCompareRequest):
     prose = await WritingAgent.generate_prose_comparison(req.paper_ids)
     return {"prose": prose}
 
+
+class SinglePaperSummaryRequest(BaseModel):
+    paper_id: str
+
+class CombinedSummaryRequest(BaseModel):
+    paper_ids: List[str]
+    topic: Optional[str] = None
+
+@app.post("/api/summary/paper")
+async def generate_single_paper_summary(req: SinglePaperSummaryRequest):
+    """
+    Generates a deep technical per-paper summary.
+    """
+    summary = await WritingAgent.generate_paper_summary(req.paper_id)
+    return {"paper_id": req.paper_id, "summary": summary}
+
+@app.post("/api/summary/combined")
+async def generate_combined_summary(req: CombinedSummaryRequest):
+    """
+    Generates a multi-paper synthesis summary.
+    """
+    summary = await WritingAgent.generate_combined_summary(req.paper_ids, req.topic)
+    return {"topic": req.topic, "paper_ids": req.paper_ids, "summary": summary}
+
+
 @app.get("/api/papers/{paper_id}")
 def get_paper_details(paper_id: str, db: Session = Depends(get_db)):
     paper = DatabaseService.get_paper_by_id(db, paper_id)

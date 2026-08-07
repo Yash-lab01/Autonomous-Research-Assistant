@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import PaperCard from "@/components/PaperCard";
 import ChatInterface from "@/components/ChatInterface";
 import ComparisonTable from "@/components/ComparisonTable";
+import PaperSummary from "@/components/PaperSummary";
 import LiteratureDraft from "@/components/LiteratureDraft";
 import ResearchGaps from "@/components/ResearchGaps";
 import ResearchTimeline from "@/components/ResearchTimeline";
@@ -27,24 +28,29 @@ const WORKFLOW_STEPS = [
     desc: "Select papers and view a side-by-side matrix of datasets, models, and metrics.",
   },
   {
+    icon: "📑",
+    title: "4. Deep Summary",
+    desc: "Per-paper deep technical breakdown or multi-paper synthesis summary.",
+  },
+  {
     icon: "📝",
-    title: "4. Generate Review",
+    title: "5. Generate Review",
     desc: "Auto-generate a structured literature survey draft with references.",
   },
   {
     icon: "⚡",
-    title: "5. Discover Gaps",
+    title: "6. Discover Gaps",
     desc: "Synthesize limitations & future work to find open research problems.",
   },
   {
     icon: "🗓️",
-    title: "6. Field Evolution",
+    title: "7. Field Evolution",
     desc: "Chronological timeline of tasks, models, and benchmark metrics over time.",
   },
 ];
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "review" | "gaps" | "timeline">("discovery");
+  const [activeTab, setActiveTab] = useState<"discovery" | "chat" | "compare" | "summary" | "review" | "gaps" | "timeline">("discovery");
   const [searchQuery, setSearchQuery] = useState(""); // ← always blank on load
   const [searchResults, setSearchResults] = useState<PaperSearchResult[]>([]);
   const [ingestedPapers, setIngestedPapers] = useState<PaperItem[]>([]);
@@ -474,7 +480,12 @@ export default function Dashboard() {
           <ComparisonTable papers={ingestedPapers} />
         )}
 
-        {/* ── Tab 4: Literature Review Generator ── */}
+        {/* ── Tab 4: Deep Paper Summary ── */}
+        {activeTab === "summary" && (
+          <PaperSummary papers={ingestedPapers} />
+        )}
+
+        {/* ── Tab 5: Literature Review Generator ── */}
         {activeTab === "review" && (
           <LiteratureDraft papers={ingestedPapers} />
         )}
