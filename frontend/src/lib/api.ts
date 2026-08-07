@@ -260,3 +260,13 @@ export async function fetchSimilarPapers(paperId: string, topK: number = 3): Pro
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function fetchProseComparison(paperIds?: string[]): Promise<{ prose: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/compare/prose`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paper_ids: paperIds || null }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

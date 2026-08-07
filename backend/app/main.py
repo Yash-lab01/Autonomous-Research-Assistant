@@ -23,6 +23,7 @@ from app.services.timeline import TimelineService
 from app.services.vision import VisionCaptioner
 from app.agents.graph import ResearchOrchestrator
 from app.agents.gap_finder import GapFinderAgent
+from app.agents.writing import WritingAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai_research_os.main")
@@ -289,6 +290,18 @@ def export_comparison_matrix(
         )
     
     return {"papers": [p.structured_data for p in papers]}
+
+
+class ProseCompareRequest(BaseModel):
+    paper_ids: Optional[List[str]] = None
+
+@app.post("/api/compare/prose")
+async def generate_prose_comparison(req: ProseCompareRequest):
+    """
+    Generates a structured narrative prose comparison across papers.
+    """
+    prose = await WritingAgent.generate_prose_comparison(req.paper_ids)
+    return {"prose": prose}
 
 @app.get("/api/papers/{paper_id}")
 def get_paper_details(paper_id: str, db: Session = Depends(get_db)):

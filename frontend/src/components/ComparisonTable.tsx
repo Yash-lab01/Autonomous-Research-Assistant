@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem, getExportComparisonCSVUrl } from "@/lib/api";
+import { PaperItem, getExportComparisonCSVUrl, fetchProseComparison, fetchPaperFigures, PaperFigure } from "@/lib/api";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface ComparisonTableProps {
   papers: PaperItem[];
@@ -87,6 +88,14 @@ function CellValue({ attrKey, paper }: { attrKey: string; paper: PaperItem }) {
 export default function ComparisonTable({ papers }: ComparisonTableProps) {
   const eligiblePapers = papers.filter((p) => p.status === "done" && p.structured_data);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"table" | "prose">("table");
+  const [proseComparison, setProseComparison] = useState<string | null>(null);
+  const [loadingProse, setLoadingProse] = useState(false);
+  const [paperFiguresMap, setPaperFiguresMap] = useState<Record<string, PaperFigure[]>>({});
+  const [loadingFiguresMap, setLoadingFiguresMap] = useState(false);
+  const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; paperTitle: string; pageNumber: number } | null>(null);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
@@ -100,6 +109,50 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
   const selectedPapers = selectedIds.length > 0
     ? eligiblePapers.filter((p) => selectedIds.includes(p.id))
     : [];
+
+  const loadFiguresForSelected = async (pids: string[]) => {
+    if (pids.length === 0) return;
+    setLoadingFiguresMap(true);
+    const newMap: Record<string, PaperFigure[]> = { ...paperFiguresMap };
+    await Promise.all(
+      pids.map(async (pid) => {
+        if (!newMap[pid]) {
+          try {
+            const res = await fetchPaperFigures(pid);
+            if (res.figures) newMap[pid] = res.figures;
+          } catch (e) {
+            console.error(`Failed to fetch figures for paper ${pid}`, e);
+          }
+        }
+      })
+    );
+    setPaperFiguresMap(newMap);
+    setLoadingFiguresMap(false);
+  };
+
+  const handleSwitchViewMode = async (mode: "table" | "prose") => {
+    setViewMode(mode);
+    if (mode === "prose" && !proseComparison && selectedPapers.length >= 2) {
+      setLoadingProse(true);
+      try {
+        const pids = selectedPapers.map((p) => p.id);
+        const res = await fetchProseComparison(pids);
+        setProseComparison(res.prose);
+      } catch (err: any) {
+        setProseComparison(`⚠️ Failed to generate prose comparison: ${err.message || err}`);
+      } finally {
+        setLoadingProse(false);
+      }
+    }
+  };
+
+  // Auto-fetch figures when papers selection changes and at least 2 are selected
+  React.useEffect(() => {
+    if (selectedPapers.length >= 2) {
+      loadFiguresForSelected(selectedPapers.map(p => p.id));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds.join(",")]);
 
   // ── Empty state ──
   if (eligiblePapers.length === 0) {
@@ -220,60 +273,163 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
             ))}
           </div>
 
-          {/* Detailed Comparison Table */}
+          {/* Figure Strip for Compared Papers */}
+          <div className="glass-panel rounded-2xl p-5 space-y-3 border border-purple-500/20">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                🖼️ Key Architecture Diagrams & Figures Across Compared Papers
+              </h4>
+              {loadingFiguresMap && (
+                <span className="text-[10px] text-purple-400 animate-pulse font-mono">Loading diagrams...</span>
+              )}
+            </div>
+
+            <div className="flex items-stretch gap-4 overflow-x-auto custom-scrollbar pb-2">
+              {selectedPapers.map((p) => {
+                const figs = paperFiguresMap[p.id] || [];
+                const topFig = figs[0]; // first/key figure
+                return (
+                  <div key={p.id} className="min-w-[240px] max-w-[280px] shrink-0 glass-panel rounded-xl p-3 border border-slate-800 flex flex-col justify-between space-y-2">
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-200 line-clamp-1">{p.title}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">arXiv:{p.arxiv_id}</p>
+                    </div>
+
+                    {topFig ? (
+                      <button
+                        onClick={() => setActiveLightboxFig({
+                          url: `${API_BASE}${topFig.url}`,
+                          caption: topFig.caption,
+                          paperTitle: p.title,
+                          pageNumber: topFig.page_number
+                        })}
+                        className="group relative w-full aspect-video rounded-lg overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center hover:border-purple-500 transition-colors"
+                      >
+                        <img
+                          src={`${API_BASE}${topFig.url}`}
+                          alt={topFig.caption}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1 text-[9px] font-mono text-purple-300">
+                          p. {topFig.page_number} {topFig.ai_captioned && "· 🤖 AI"}
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="w-full aspect-video rounded-lg border border-slate-800/60 bg-slate-950/40 flex items-center justify-center text-[10px] text-slate-600">
+                        No diagram extracted
+                      </div>
+                    )}
+
+                    {topFig && (
+                      <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug">
+                        {topFig.caption}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Detailed Comparison Container (Table vs Prose) */}
           <div className="glass-panel rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="text-base font-bold text-slate-100">Side-by-Side Comparison</h3>
+                <h3 className="text-base font-bold text-slate-100">
+                  {viewMode === "table" ? "Side-by-Side Table Comparison" : "Structured AI Prose Comparison"}
+                </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Technical taxonomy across {selectedPapers.length} selected papers
+                  Comparative analysis across {selectedPapers.length} selected papers
                 </p>
               </div>
+
+              {/* View Mode Toggle Controls */}
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-slate-500 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
-                  {selectedPapers.length} papers · {ATTR_ROWS.length} attributes
-                </span>
-                <a
-                  href={getExportComparisonCSVUrl(selectedPapers.map(p => p.id))}
-                  download="research_comparison_matrix.csv"
-                  className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 text-xs font-medium transition-all flex items-center gap-1.5"
-                >
-                  📥 Export CSV
-                </a>
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800">
+                  <button
+                    onClick={() => handleSwitchViewMode("table")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      viewMode === "table"
+                        ? "bg-blue-600 text-white shadow"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    📊 Table View
+                  </button>
+                  <button
+                    onClick={() => handleSwitchViewMode("prose")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      viewMode === "prose"
+                        ? "bg-purple-600 text-white shadow"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    📝 Prose Analysis Mode
+                  </button>
+                </div>
+
+                {viewMode === "table" && (
+                  <a
+                    href={getExportComparisonCSVUrl(selectedPapers.map(p => p.id))}
+                    download="research_comparison_matrix.csv"
+                    className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 text-xs font-medium transition-all flex items-center gap-1.5"
+                  >
+                    📥 Export CSV
+                  </a>
+                )}
               </div>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/60">
-                    <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-44 sticky left-0 bg-slate-900/95">
-                      Attribute
-                    </th>
-                    {selectedPapers.map((p) => (
-                      <th key={p.id} className="p-4 text-sm font-bold text-blue-400 min-w-[260px] border-l border-slate-800/80">
-                        <div className="line-clamp-2">{p.title}</div>
-                        <div className="text-xs font-mono text-slate-500 font-normal mt-1">arXiv:{p.arxiv_id || p.id}</div>
+            {/* Table View Mode */}
+            {viewMode === "table" && (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-900/60">
+                      <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-44 sticky left-0 bg-slate-900/95">
+                        Attribute
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-xs">
-                  {ATTR_ROWS.map((row) => (
-                    <tr key={row.key} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="p-4 font-semibold text-slate-300 bg-slate-950/40 sticky left-0 align-top">
-                        {row.label}
-                      </td>
                       {selectedPapers.map((p) => (
-                        <td key={p.id} className="p-4 border-l border-slate-800/80 align-top">
-                          <CellValue attrKey={row.key} paper={p} />
-                        </td>
+                        <th key={p.id} className="p-4 text-sm font-bold text-blue-400 min-w-[260px] border-l border-slate-800/80">
+                          <div className="line-clamp-2">{p.title}</div>
+                          <div className="text-xs font-mono text-slate-500 font-normal mt-1">arXiv:{p.arxiv_id || p.id}</div>
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 text-xs">
+                    {ATTR_ROWS.map((row) => (
+                      <tr key={row.key} className="hover:bg-slate-800/20 transition-colors">
+                        <td className="p-4 font-semibold text-slate-300 bg-slate-950/40 sticky left-0 align-top">
+                          {row.label}
+                        </td>
+                        {selectedPapers.map((p) => (
+                          <td key={p.id} className="p-4 border-l border-slate-800/80 align-top">
+                            <CellValue attrKey={row.key} paper={p} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Prose View Mode */}
+            {viewMode === "prose" && (
+              <div className="p-8 max-w-4xl space-y-4">
+                {loadingProse ? (
+                  <div className="flex items-center gap-3 p-6 glass-panel rounded-xl max-w-md text-slate-300 text-xs font-mono">
+                    <span className="w-3 h-3 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" />
+                    Groq 70B generating structured prose comparison...
+                  </div>
+                ) : proseComparison ? (
+                  <MarkdownRenderer content={proseComparison} />
+                ) : (
+                  <div className="text-xs text-slate-500">Click Prose Analysis Mode to generate comparative narrative.</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Research Gaps Section */}
@@ -316,6 +472,37 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal for Figure Strip */}
+      {activeLightboxFig && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="glass-panel-glow max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="font-bold text-slate-100">{activeLightboxFig.paperTitle}</h4>
+                <p className="text-xs text-slate-400 font-mono">Page {activeLightboxFig.pageNumber}</p>
+              </div>
+              <button
+                onClick={() => setActiveLightboxFig(null)}
+                className="text-slate-400 hover:text-white px-3 py-1 rounded-lg bg-slate-800 text-xs font-medium"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <img
+                src={activeLightboxFig.url}
+                alt={activeLightboxFig.caption}
+                className="max-h-[60vh] object-contain rounded-lg"
+              />
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              <span className="font-semibold text-purple-400 block mb-1">Figure Caption / AI Analysis</span>
+              {activeLightboxFig.caption}
             </div>
           </div>
         </div>

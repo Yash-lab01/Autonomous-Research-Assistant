@@ -102,6 +102,71 @@ class WritingAgent:
         return state
 
     @staticmethod
+    async def generate_prose_comparison(paper_ids: List[str] = None) -> str:
+        """
+        Generates structured academic prose comparison across specified papers.
+        """
+        db: Session = SessionLocal()
+        all_papers = DatabaseService.list_papers(db)
+        db.close()
+
+        if paper_ids:
+            papers = [p for p in all_papers if p.id in paper_ids and p.structured_data]
+        else:
+            papers = [p for p in all_papers if p.structured_data][:6]
+
+        if not papers:
+            return "No structured paper data available for prose comparison. Please ensure selected papers have completed processing."
+
+        paper_entries = []
+        for p in papers:
+            sd = p.structured_data or {}
+            entry = (
+                f"Title: {p.title}\n"
+                f"Primary Task: {sd.get('primary_task', 'N/A')}\n"
+                f"Backbone Models: {', '.join(sd.get('backbone_models', []))}\n"
+                f"Datasets Used: {', '.join(sd.get('datasets_used', []))}\n"
+                f"Benchmark Metrics: {sd.get('benchmark_metrics', {})}\n"
+                f"Limitations: {'; '.join(sd.get('limitations', []))}\n"
+                f"Future Work: {'; '.join(sd.get('future_work', []))}"
+            )
+            paper_entries.append(entry)
+
+        combined = "\n\n---\n\n".join(paper_entries)
+
+        PROSE_COMPARE_SYSTEM_PROMPT = """You are a senior AI research scientist and lead technical editor.
+Your task is to write a comprehensive, highly detailed, structured prose comparison across multiple scientific research papers.
+
+STRICT FORMATTING RULES:
+- Use markdown section headers:
+  ## 1. Comparative Overview
+  ## 2. Architectural Approaches & Backbones
+  ## 3. Training Datasets & Evaluation Benchmarks
+  ## 4. Empirical Performance & Trade-offs
+  ## 5. Limitations & Open Research Gaps
+  ## 6. Synthesis & Conclusions
+- Under each section header, write 2–3 dense, informative paragraphs of academic prose.
+- Do NOT use bullet points or asterisk lists anywhere in the main sections. Write complete analytical sentences only.
+- Explicitly cite papers by title inline (e.g. "As demonstrated in 'Paper Title'...").
+- Contrast methodologies, architectural choices, efficiency trade-offs, and benchmark findings directly.
+"""
+
+        prompt = f"""Write a structured prose comparison analyzing and contrasting the following {len(papers)} papers:
+
+{combined}
+
+Write the full comparative prose analysis now following all formatting rules strictly."""
+
+        response = await LLMFactory.invoke_llm(
+            prompt=prompt,
+            system_prompt=PROSE_COMPARE_SYSTEM_PROMPT,
+            workload_type="interactive",
+            temperature=0.2
+        )
+
+        return response
+
+    @staticmethod
     async def _generate_literature_review(state: ResearchAgentState) -> ResearchAgentState:
         state.step_logs.append("[Writing Agent] Synthesizing literature review draft...")
         db: Session = SessionLocal()
