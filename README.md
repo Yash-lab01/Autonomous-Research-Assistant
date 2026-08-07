@@ -1,120 +1,200 @@
 # AI Research OS 🧠🚀
 
-**AI Research OS** is an autonomous local-first & cloud-boosted AI research assistant system that continuously discovers, ingests, understands, compares, and synthesizes research papers across subjects with full paragraph-level citation traceability.
+**AI Research OS** is an autonomous, local-first & cloud-boosted AI research assistant. It discovers, ingests, understands, compares, and synthesizes research papers — with full paragraph-level citation traceability, AI-captioned figure extraction, and streaming chat powered by a LangGraph multi-agent pipeline.
+
+[![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🌟 Key Features (Phase 1)
+## ✨ Features
 
-- **🔍 arXiv Automatic Discovery**: Search arXiv by keyword or topic with automatic rate-limit etiquette and duplicate checking.
-- **📄 Two-Stage Hybrid PDF Parser**: Fast-path text parsing (<1s) using `pdfplumber` with automated quality heuristic checks routing to `Docling` for layout-aware table extraction.
-- **⚡ Dual LLM Workload Router (`llm_factory.py`)**:
-  - **Bulk Background Extraction**: Uses local **Ollama** (`qwen2.5:7b`) to save cloud API limits during bulk paper processing.
-  - **Interactive RAG & Review**: Uses **Groq API** (`llama-3.3-70b-versatile`) for ultra-fast response times.
-  - **429 Failover**: Catches API rate limits or network timeouts and gracefully fails over to local Ollama.
-- **⚡ Non-Blocking Async Ingestion**: Real-time paper ingestion status (`queued` → `downloading` → `parsing` → `extracting` → `embedding` → `done` / `failed`).
-- **📌 Verified Citation RAG**: Search and chat across indexed papers with clickable inline citation badges `[1]` that pop up the exact source paragraph snippet.
-- **📊 Multi-Paper Comparison Matrix**: Side-by-side taxonomy of tasks, backbone models, datasets, accuracy metrics, and limitations.
-- **📝 Literature Review Survey Generator**: Synthesizes Introduction, Background, Existing Methods, Gaps, and Future Directions with BibTeX reference exports.
+### 🔍 Paper Discovery & Ingestion
+- **arXiv Search** with sort controls (Relevance / Latest / Updated) and result count selector (3 / 6 / 10 / 15)
+- **Batch Ingest All** — queue every search result in one click; duplicates automatically skipped
+- **"Already in Library" badge** on search results so you never re-ingest accidentally
+- **Real-time ingestion pipeline**: `queued → downloading → parsing → extracting → embedding → done`
+- **Retry failed papers** — one-click re-queue directly from the library
+- **Smart polling** — status updates only fire while papers are actively processing; zero API calls at rest
+
+### 📄 PDF Intelligence
+- **Hybrid PDF Parser**: fast-path `pdfplumber` with quality-check auto-fallback to `Docling` for multi-column/table layouts
+- **Math extraction** — detects and tags `[MATH]` regions
+- **Table extraction** — extracts tables as Markdown `[TABLE]` chunks
+- **AI Figure Captioning** — extracts architecture diagrams, benchmark plots, and result figures using `qwen2.5vl:3b` (Ollama vision model) with fallback descriptions
+
+### 💬 Chat & RAG
+- **Streaming Chat (SSE)** — live step-log ticker while the agent pipeline runs (Planning → Retrieving → Writing); no more waiting for a blocking response
+- **Paragraph-level citation RAG** — every claim is cited with `[Citation N, p.X]` badges that open the exact source paragraph
+- **Voice Research Mode** — push-to-talk input + speech synthesis readback
+- **Chat history persistence** — localStorage saves last 30 messages; Clear button to reset
+- **Ctrl+Enter** keyboard shortcut to send
+- **Verified Citation Inspector** — click any citation badge to see the exact extracted paragraph
+
+### 🤖 AI Agent Pipeline (LangGraph)
+- **Planner Agent** — classifies intent: `qa / compare / review / search`
+- **Search Agent** — arXiv discovery with structured metadata extraction
+- **Reading Agent** — Qdrant vector RAG retrieval with page-level context
+- **Writing Agent** — synthesizes responses, comparisons, and literature reviews with inline citations
+- **Dual LLM Router** (`llm_factory.py`):
+  - **Interactive tasks** → Groq API (`llama-3.3-70b-versatile`) — ultra-fast, high-quality
+  - **Bulk background extraction** → Local Ollama (`qwen2.5:7b`) — saves cloud quota
+  - **Auto-failover** — catches 429 rate limits and timeouts, falls back to Ollama seamlessly
+
+### 📊 Analysis & Export
+- **Multi-Paper Comparison Matrix** — side-by-side taxonomy: task, backbone models, datasets, metrics, limitations
+- **Literature Review Generator** — structured academic survey (Introduction → Background → Methods → Gaps → Future Work) generated by Groq 70B using your papers' structured data
+- **Research Gap Finder** — surfaces open problems and novel ideas by cross-referencing `limitations` and `future_work` fields across all ingested papers
+- **Research Timeline** — visual chronological evolution of a research field based on publication dates
+- **Citation Export** — BibTeX, APA, IEEE, MLA formats
+- **CSV Export** — comparison matrix as downloadable spreadsheet
+
+### 📚 Library Management
+- **Notes & Tags** — inline editor on every paper card; tags with chip display
+- **Filter Library** — real-time title search in the knowledge base
+- **Find Similar** — Qdrant-powered semantic similarity discovery (top-3 related papers with % scores)
+- **Delete papers** with one-click removal from vector index + database
 
 ---
 
 ## 🏗️ Tech Stack
 
-- **Frontend**: Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS, Glassmorphic Dark Theme)
-- **Backend API**: FastAPI (Python 3.11+)
-- **Agent Orchestrator**: LangGraph (Planner, Search, Reading, and Writing Agents)
-- **Vector Database**: Qdrant (with in-memory vector fallback)
-- **Database & Cache**: SQLite (SQLAlchemy / SQLModel) + Redis
-- **LLM Models**: Groq (`llama-3.3-70b-versatile`) + Local Ollama (`qwen2.5:7b`)
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15, React 19, TypeScript, Vanilla CSS + Glassmorphic dark theme |
+| Backend API | FastAPI (Python 3.11+), Uvicorn with hot-reload |
+| Agent Orchestrator | LangGraph (Planner → Search → Reading → Writing pipeline) |
+| Vector Database | Qdrant (persistent) with in-memory fallback |
+| Relational Database | SQLite via SQLAlchemy ORM |
+| LLM — Interactive | Groq API (`llama-3.3-70b-versatile`) |
+| LLM — Bulk/Local | Ollama (`qwen2.5:7b`) |
+| Vision Model | Ollama (`qwen2.5vl:3b`) for figure captioning |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| Streaming | Server-Sent Events (SSE) for real-time chat |
+| PDF Parsing | pdfplumber (fast-path) + Docling (layout-aware fallback) |
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.10+
-- Node.js 18+ & npm
-- (Optional) [Ollama](https://ollama.com/) running `qwen2.5:7b` locally
-- (Optional) [Groq API Key](https://console.groq.com/) set in `.env`
-
-### 1. Environment Setup
-Clone or navigate to the repository folder:
+### Option 1 — Single Script (Recommended)
 ```powershell
+.\start.ps1
+```
+Validates `.env`, checks Ollama & Qdrant health, then starts both services with streamed logs.
+
+### Option 2 — Manual
+
+**Prerequisites:**
+- Python 3.10+ and Node.js 18+
+- [Ollama](https://ollama.com/) with `qwen2.5:7b` and `qwen2.5vl:3b` pulled
+- [Groq API Key](https://console.groq.com/) (optional but recommended for best quality)
+- [Docker](https://docker.com/) for persistent Qdrant (optional — in-memory fallback works)
+
+```powershell
+# 1. Clone and enter directory
 cd "AI- Research Agent"
-```
 
-Copy `.env.example` to `.env`:
-```powershell
+# 2. Copy environment file
 cp .env.example .env
-```
-*(Optionally add your `GROQ_API_KEY` in `.env`)*
+# Add your GROQ_API_KEY to .env
 
-### 2. Backend Setup
-Create and activate Python virtual environment:
-```powershell
+# 3. Backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
+python run_backend.py       # http://localhost:8000
 
-Run the backend FastAPI server:
-```powershell
-python run_backend.py
-```
-*FastAPI documentation will be available at [http://localhost:8000/docs](http://localhost:8000/docs).*
-
-### 3. Frontend Setup
-In a new terminal window:
-```powershell
+# 4. Frontend (new terminal)
 cd frontend
 npm install
-npm run dev
+npm run dev                 # http://localhost:3000
+
+# 5. (Optional) Persistent Qdrant vector store
+docker run -p 6333:6333 qdrant/qdrant
 ```
-*Open [http://localhost:3000](http://localhost:3000) in your browser.*
+
+| Service | URL |
+|---------|-----|
+| Frontend App | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| Qdrant Dashboard | http://localhost:6333/dashboard |
+
+### Pull Ollama Models
+```bash
+ollama pull qwen2.5:7b        # Main text extraction & RAG
+ollama pull qwen2.5vl:3b      # Vision model for figure captioning
+```
 
 ---
 
-## 📁 Repository Directory Structure
+## 📁 Project Structure
 
 ```
 AI-Research-Agent/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                  # FastAPI entry point & API endpoints
-│   │   ├── config.py                # App & model configurations
-│   │   ├── agents/                  # LangGraph Agent orchestrations
-│   │   │   ├── planner.py           # Intent Classification Agent
-│   │   │   ├── search.py            # arXiv Discovery Agent
-│   │   │   ├── reading.py           # Paragraph Vector RAG Agent
-│   │   │   ├── writing.py           # Synthesis, Comparison & Citation Agent
-│   │   │   └── graph.py             # Workflow graph orchestrator
+│   │   ├── main.py                  # FastAPI endpoints (ingest, chat, papers, export)
+│   │   ├── config.py                # Model & service configuration
+│   │   ├── agents/
+│   │   │   ├── planner.py           # Intent classification agent
+│   │   │   ├── search.py            # arXiv discovery agent
+│   │   │   ├── reading.py           # Vector RAG retrieval agent
+│   │   │   ├── writing.py           # Synthesis, comparison & citation agent
+│   │   │   ├── gap_finder.py        # Research gap & novel idea finder
+│   │   │   └── graph.py             # LangGraph orchestrator (run + run_streaming)
 │   │   ├── services/
-│   │   │   ├── llm_factory.py       # Dual LLM router (Ollama + Groq 70B failover)
-│   │   │   ├── arxiv_client.py      # arXiv API downloader & rate limiter
+│   │   │   ├── llm_factory.py       # Dual LLM router (Groq → Ollama failover)
+│   │   │   ├── arxiv_client.py      # arXiv API with sort & rate limiting
 │   │   │   ├── pdf_parser.py        # Hybrid parser (pdfplumber + Docling)
-│   │   │   ├── extractor.py         # Structured JSON extractor
-│   │   │   ├── vector_store.py      # Qdrant RAG client wrapper
-│   │   │   ├── ingestion.py        # Non-blocking async ingestion pipeline
-│   │   │   └── db.py                # SQLite ORM & persistence layer
+│   │   │   ├── extractor.py         # Structured JSON extraction (task/models/datasets/metrics)
+│   │   │   ├── vector_store.py      # Qdrant RAG client + in-memory fallback
+│   │   │   ├── vision.py            # qwen2.5vl:3b figure captioning service
+│   │   │   ├── ingestion.py         # Async ingestion pipeline (background tasks)
+│   │   │   └── db.py                # SQLite ORM & DatabaseService
 │   │   └── models/
 │   │       ├── paper.py             # Pydantic schemas
 │   │       └── db_models.py         # SQLAlchemy ORM models
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── app/                     # Next.js App Router pages
-│   │   ├── components/              # UI Components (ChatInterface, ComparisonTable, etc.)
-│   │   └── lib/                     # API client
+│   │   ├── app/
+│   │   │   └── page.tsx             # Main dashboard (search, library, all tabs)
+│   │   ├── components/
+│   │   │   ├── ChatInterface.tsx    # SSE streaming chat with voice & citations
+│   │   │   ├── PaperCard.tsx        # Paper card (figures, similar, notes, tags)
+│   │   │   ├── ComparisonMatrix.tsx # Multi-paper comparison table
+│   │   │   ├── LiteratureDraft.tsx  # Literature review with Markdown rendering
+│   │   │   ├── ResearchGaps.tsx     # Gap finder & novel ideas
+│   │   │   ├── ResearchTimeline.tsx # Field evolution timeline
+│   │   │   └── MarkdownRenderer.tsx # KaTeX math + table Markdown renderer
+│   │   └── lib/
+│   │       └── api.ts               # Typed API client for all endpoints
+├── data/                            # PDFs & extracted figures (gitignored)
 ├── docker-compose.yml               # Qdrant & Redis containers
-├── run_backend.py                   # Backend starter script
-├── NEXT_STEPS.md                    # Roadmap & future implementation plan
-├── README.md                        # Project documentation
-└── .gitignore
+├── start.ps1                        # One-command startup script
+├── run_backend.py                   # Backend dev server launcher
+├── NEXT_STEPS.md                    # Phase 3+ roadmap & implementation plans
+└── .env.example                     # Environment variable template
 ```
+
+---
+
+## 🗺️ Roadmap
+
+See [NEXT_STEPS.md](NEXT_STEPS.md) for the full Phase 3 implementation plans:
+
+- **P3.1** — Figure-Aware RAG in Chat (auto-detect relevant figures, inline thumbnails + captions)
+- **P3.2** — Deep Paper Summary (per-paper + combined, with embedded figures)
+- **P3.3** — Figures in Compare Papers + prose mode toggle
+- **P3.4** — Figures embedded in Literature Review export
+- **Phase 4** — Neo4j GraphRAG, n8n Digest, Model Fine-Tuning
 
 ---
 
 ## 🛡️ License
 
-MIT License. Designed and built as an autonomous AI research system.
+MIT License. Designed and built as an autonomous AI research assistant system.
