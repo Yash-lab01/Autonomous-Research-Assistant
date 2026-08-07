@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ChatResponse, CitationItem, PaperItem } from "@/lib/api";
+import { ChatResponse, CitationItem, PaperItem, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -16,7 +16,7 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
   const [query, setQuery] = useState("");
   const [selectedPaperIds, setSelectedPaperIds] = useState<string[]>([]);
   const [messages, setMessages] = useState<
-    { role: "user" | "assistant"; content: string; citations?: CitationItem[]; stepLogs?: string[] }[]
+    { role: "user" | "assistant"; content: string; citations?: CitationItem[]; figuresCited?: PaperFigure[]; stepLogs?: string[] }[]
   >(() => {
     // Restore from localStorage on first render
     if (typeof window !== "undefined") {
@@ -30,6 +30,7 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
   const [loading, setLoading] = useState(false);
   const [liveStep, setLiveStep] = useState<string | null>(null);
   const [activeCitation, setActiveCitation] = useState<CitationItem | null>(null);
+  const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; pageNumber: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Voice Research Mode states
@@ -159,6 +160,7 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
                   role: "assistant",
                   content: event.response,
                   citations: event.citations,
+                  figuresCited: event.figures_cited,
                   stepLogs: event.step_logs
                 }
               ]);
@@ -302,6 +304,42 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
                 <div className="whitespace-pre-wrap">{m.content}</div>
               )}
 
+              {/* Matched Relevant Figures & Diagrams */}
+              {m.figuresCited && m.figuresCited.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-2">
+                  <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                    🖼️ Relevant Diagrams & Figures ({m.figuresCited.length}):
+                  </span>
+                  <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar pb-1">
+                    {m.figuresCited.map((fig, figIdx) => (
+                      <button
+                        key={figIdx}
+                        onClick={() => setActiveLightboxFig({
+                          url: fig.url.startsWith("http") ? fig.url : `${API_BASE_URL}${fig.url}`,
+                          caption: fig.caption || `Diagram on page ${fig.page_number}`,
+                          pageNumber: fig.page_number
+                        })}
+                        className="group shrink-0 flex flex-col gap-1 w-36 text-left p-1.5 rounded-lg bg-slate-950/80 border border-slate-800 hover:border-purple-500/60 transition-all"
+                      >
+                        <div className="aspect-video w-full rounded overflow-hidden bg-slate-900 flex items-center justify-center border border-slate-850 relative">
+                          <img
+                            src={fig.url.startsWith("http") ? fig.url : `${API_BASE_URL}${fig.url}`}
+                            alt={fig.caption}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <span className="absolute bottom-0.5 right-0.5 text-[8px] font-mono text-purple-300 bg-slate-950/90 px-1 rounded">
+                            p.{fig.page_number}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-tight">
+                          {fig.caption}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Citations List Badges */}
               {m.citations && m.citations.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center gap-2">
@@ -408,6 +446,37 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
               >
                 Close Inspector
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal for Figures in Chat */}
+      {activeLightboxFig && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="glass-panel-glow max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="font-bold text-slate-100 flex items-center gap-2">🖼️ Relevant Figure Preview</h4>
+                <p className="text-xs text-slate-400 font-mono">Page {activeLightboxFig.pageNumber}</p>
+              </div>
+              <button
+                onClick={() => setActiveLightboxFig(null)}
+                className="text-slate-400 hover:text-white px-3 py-1 rounded-lg bg-slate-800 text-xs font-medium"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <img
+                src={activeLightboxFig.url}
+                alt={activeLightboxFig.caption}
+                className="max-h-[60vh] object-contain rounded-lg"
+              />
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              <span className="font-semibold text-purple-400 block mb-1">Figure Caption / AI Analysis</span>
+              {activeLightboxFig.caption}
             </div>
           </div>
         </div>

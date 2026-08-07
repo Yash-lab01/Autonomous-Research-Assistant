@@ -11,4 +11,5 @@ class ResearchAgentState(BaseModel):
     literature_review: Optional[Dict[str, Any]] = None
     final_response: str = ""
     citations: List[Dict[str, Any]] = Field(default_factory=list)
+    figures_cited: List[Dict[str, Any]] = Field(default_factory=list)
     step_logs: List[str] = Field(default_factory=list)

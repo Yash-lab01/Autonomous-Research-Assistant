@@ -79,3 +79,16 @@ class ParagraphORM(Base):
     text = Column(Text, nullable=False)
     section_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FigureORM(Base):
+    __tablename__ = "figures"
+
+    id = Column(String, primary_key=True, index=True)
+    paper_id = Column(String, index=True, nullable=False)
+    figure_id = Column(String, nullable=False)
+    page_number = Column(Integer, nullable=False)
+    url = Column(String, nullable=False)
+    caption = Column(Text, nullable=True)
+    ai_captioned = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)

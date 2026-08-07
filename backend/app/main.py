@@ -406,6 +406,7 @@ async def chat_with_agent(
         "intent": state.intent,
         "response": state.final_response,
         "citations": state.citations,
+        "figures_cited": state.figures_cited,
         "step_logs": state.step_logs,
         "comparison_data": state.comparison_data,
         "literature_review": state.literature_review
@@ -448,6 +449,7 @@ async def chat_stream(
                 "intent": state.intent,
                 "response": state.final_response,
                 "citations": state.citations,
+                "figures_cited": state.figures_cited,
                 "step_logs": state.step_logs,
                 "comparison_data": state.comparison_data,
                 "literature_review": state.literature_review
@@ -566,6 +568,8 @@ async def get_paper_figures(paper_id: str, db: Session = Depends(get_db)):
             fig["ai_captioned"] = False
         if not vision_ok:
             logger.info("Vision model not available — returning figures with fallback captions")
+
+    DatabaseService.save_figures(db, paper_id, figures)
 
     return {
         "paper_id": paper_id,

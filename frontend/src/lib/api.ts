@@ -51,6 +51,7 @@ export interface ChatResponse {
   intent: string;
   response: string;
   citations: CitationItem[];
+  figures_cited?: PaperFigure[];
   step_logs: string[];
   comparison_data?: any;
   literature_review?: any;

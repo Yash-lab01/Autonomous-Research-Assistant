@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import settings
-from app.models.db_models import Base, PaperORM, ParagraphORM
+from app.models.db_models import Base, PaperORM, ParagraphORM, FigureORM
 from app.models.paper import PaperMetadata, PaperStatus, ParagraphChunk, StructuredPaperExtraction
 
 engine = create_engine(
@@ -151,3 +151,32 @@ class DatabaseService:
         db.commit()
         db.refresh(paper)
         return paper
+
+    @staticmethod
+    def save_figures(db: Session, paper_id: str, figures: List[dict]):
+        if not figures:
+            return
+        db.query(FigureORM).filter(FigureORM.paper_id == paper_id).delete()
+        db_figures = [
+            FigureORM(
+                id=f"{paper_id}_{f.get('figure_id', idx)}",
+                paper_id=paper_id,
+                figure_id=str(f.get('figure_id', idx)),
+                page_number=int(f.get('page_number', 1)),
+                url=str(f.get('url', '')),
+                caption=str(f.get('caption', '')),
+                ai_captioned=1 if f.get('ai_captioned') else 0
+            )
+            for idx, f in enumerate(figures, start=1)
+        ]
+        db.add_all(db_figures)
+        db.commit()
+
+    @staticmethod
+    def get_figures_by_pages(db: Session, paper_id: str, page_numbers: List[int]) -> List[FigureORM]:
+        if not page_numbers:
+            return []
+        return db.query(FigureORM).filter(
+            FigureORM.paper_id == paper_id,
+            FigureORM.page_number.in_(page_numbers)
+        ).all()
