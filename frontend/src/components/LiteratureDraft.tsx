@@ -288,19 +288,25 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
     <div className="space-y-6">
 
       {/* ── Step 1: Select Papers ─────────────────────────────────────────── */}
-      <div className="glass-panel rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-100">📝 Step 1 — Select Papers for Review</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Choose which papers to include. The review will only synthesize the ones you select.
-            </p>
+      <div className="glass-panel rounded-2xl p-6 space-y-4 border border-slate-800/80 shadow-2xl relative overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="absolute -right-16 -top-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <span>📝</span> Step 1 — Select Papers for Survey Draft
+            </h2>
+            <span className="text-xs font-mono text-blue-300 bg-blue-500/15 px-2.5 py-0.5 rounded-full border border-blue-500/30">
+              {selectedIds.length === 0 ? "No Papers Selected" : `${selectedIds.length} Selected`}
+            </span>
           </div>
+
           <div className="flex items-center gap-2">
-            <button onClick={selectAll} className="px-3 py-1.5 text-xs rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors">
-              Select All
+            <button onClick={selectAll} className="px-3.5 py-1.5 text-xs rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 font-medium transition-all">
+              Select All ({completedPapers.length})
             </button>
-            <button onClick={clearAll} className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors">
+            <button onClick={clearAll} className="px-3.5 py-1.5 text-xs rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 font-medium transition-all">
               Clear
             </button>
           </div>

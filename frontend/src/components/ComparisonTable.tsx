@@ -172,25 +172,31 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
 
   return (
     <div className="space-y-6">
-      {/* ── Paper Selector ── */}
-      <div className="glass-panel rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-100">📊 Select Papers to Compare</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Choose 2 or more papers from your knowledge base. The comparison matrix updates instantly.
-            </p>
+      {/* Paper Selection Header */}
+      <div className="glass-panel rounded-2xl p-6 space-y-4 border border-slate-800/80 shadow-2xl relative overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="absolute -right-16 -top-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <span>📊</span> Compare Papers Matrix
+            </h2>
+            <span className="text-xs font-mono text-purple-300 bg-purple-500/15 px-2.5 py-0.5 rounded-full border border-purple-500/30">
+              {selectedIds.length === 0 ? "No Papers Selected" : `${selectedIds.length} Selected`}
+            </span>
           </div>
+
           <div className="flex items-center gap-2">
             <button
               onClick={selectAll}
-              className="px-3 py-1.5 text-xs rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
+              className="px-3.5 py-1.5 text-xs rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 font-medium transition-all"
             >
-              Select All
+              Select All ({eligiblePapers.length})
             </button>
             <button
               onClick={clearAll}
-              className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+              className="px-3.5 py-1.5 text-xs rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 font-medium transition-all"
             >
               Clear
             </button>
@@ -204,23 +210,25 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
               <button
                 key={p.id}
                 onClick={() => toggleSelect(p.id)}
-                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all relative group ${
                   isSelected
-                    ? "bg-blue-600/15 border-blue-500/50 shadow-sm shadow-blue-500/10"
-                    : "bg-slate-900/60 border-slate-800 hover:border-slate-600"
+                    ? "bg-gradient-to-r from-blue-950/40 to-indigo-950/40 border-blue-500/60 shadow-lg shadow-blue-500/10"
+                    : "bg-slate-950/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/60"
                 }`}
               >
                 {/* Checkbox */}
                 <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  isSelected ? "bg-blue-600 border-blue-500" : "border-slate-600"
+                  isSelected ? "bg-blue-600 border-blue-500 shadow-sm shadow-blue-500" : "border-slate-700 group-hover:border-slate-500"
                 }`}>
                   {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
                 </div>
-                <div className="min-w-0">
-                  <p className={`text-xs font-semibold line-clamp-2 ${isSelected ? "text-blue-300" : "text-slate-200"}`}>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 inline-block mb-1">
+                    arXiv:{p.arxiv_id || p.id.slice(0, 10)}
+                  </span>
+                  <p className={`text-xs font-semibold line-clamp-2 leading-relaxed ${isSelected ? "text-blue-200" : "text-slate-200"}`}>
                     {p.title}
                   </p>
-                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">arXiv:{p.arxiv_id}</p>
                 </div>
               </button>
             );

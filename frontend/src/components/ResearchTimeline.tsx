@@ -48,13 +48,21 @@ export default function ResearchTimeline({ papers }: ResearchTimelineProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header Summary */}
-      <div className="glass-panel rounded-2xl p-6 border border-purple-500/20 bg-purple-500/5 space-y-4">
+      {/* Header Summary & Filters */}
+      <div className="glass-panel rounded-2xl p-6 border border-purple-500/30 bg-slate-950/60 space-y-4 shadow-2xl relative overflow-hidden">
+        {/* Ambient Radial Glow */}
+        <div className="absolute -left-16 -top-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <span>🗓️ Interactive Research Timeline & Field Evolution</span>
-            </h2>
+            <div className="flex items-center gap-3 mb-1">
+              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <span>🗓️</span> Chronological Field Evolution & Benchmark Progression
+              </h2>
+              <span className="text-[10px] font-mono text-purple-300 bg-purple-500/15 px-2.5 py-0.5 rounded-full border border-purple-500/30">
+                Timeline Mode Active
+              </span>
+            </div>
             <p className="text-xs text-slate-400 mt-1">
               Visualizes the chronological progression of tasks, backbone models, and benchmark methodologies across publication dates in your knowledge base.
             </p>
@@ -66,11 +74,11 @@ export default function ResearchTimeline({ papers }: ResearchTimelineProps) {
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Filter timeline by model, dataset, or keyword..."
-              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/60 w-64"
+              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500/60 w-64 shadow-inner"
             />
             <button
               onClick={loadTimeline}
-              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all"
+              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-all"
             >
               🔄 Refresh
             </button>

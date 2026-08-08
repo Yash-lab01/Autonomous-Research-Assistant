@@ -128,12 +128,20 @@ export default function ResearchGaps({ papers }: ResearchGapsProps) {
   return (
     <div className="space-y-6">
       {/* Configuration & Selection Panel */}
-      <div className="glass-panel rounded-2xl p-6 space-y-5 border border-amber-500/20 bg-amber-500/5">
-        <div className="flex items-start justify-between gap-4">
+      <div className="glass-panel rounded-2xl p-6 space-y-5 border border-amber-500/30 bg-slate-950/60 shadow-2xl relative overflow-hidden">
+        {/* Ambient Amber Glow */}
+        <div className="absolute -right-16 -top-16 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <span>⚡ Research Gap Finder & Novel Innovation Agent</span>
-            </h2>
+            <div className="flex items-center gap-3 mb-1">
+              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <span>⚡</span> Research Gap Finder & Innovation Agent
+              </h2>
+              <span className="text-[10px] font-mono text-amber-300 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                AI Synthesis Engine Active
+              </span>
+            </div>
             <p className="text-xs text-slate-400 mt-1">
               Cross-references stated <span className="text-rose-400 font-semibold">limitations</span>, <span className="text-amber-400 font-semibold">future work</span>, benchmark metrics, and datasets across your ingested papers to synthesize unaddressed open problems and novel thesis/project ideas.
             </p>
@@ -142,13 +150,13 @@ export default function ResearchGaps({ papers }: ResearchGapsProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={selectAll}
-              className="px-3 py-1.5 text-xs rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
+              className="px-3.5 py-1.5 text-xs rounded-xl bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30 font-medium transition-all"
             >
-              Select All
+              Select All ({completedPapers.length})
             </button>
             <button
               onClick={clearAll}
-              className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+              className="px-3.5 py-1.5 text-xs rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 font-medium transition-all"
             >
               Clear
             </button>

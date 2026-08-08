@@ -198,14 +198,21 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
   };
 
   return (
-    <div className="flex flex-col h-[78vh] glass-panel rounded-2xl overflow-hidden">
+    <div className="flex flex-col h-[78vh] glass-panel rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl relative">
+      {/* Ambient Radial Glow */}
+      <div className="absolute -left-20 -top-20 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
       {/* Paper Scope Selector Header */}
-      <div className="p-4 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400">Target Knowledge Scope:</span>
-          <span className="text-xs font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+      <div className="p-4 border-b border-slate-800/80 bg-slate-950/60 flex items-center justify-between gap-4 flex-wrap z-10">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-slate-300">Target Knowledge Scope:</span>
+          <span className="text-xs font-mono text-blue-300 bg-blue-500/15 px-2.5 py-0.5 rounded-full border border-blue-500/30">
             {selectedPaperIds.length === 0 ? "All Ingested Papers" : `${selectedPaperIds.length} Selected`}
           </span>
+          <div className="hidden lg:flex items-center gap-2 bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
+            <span className="text-[10px] font-mono text-purple-300">Live SSE RAG Stream</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -217,7 +224,7 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
               setMessages(initial);
               localStorage.removeItem(CHAT_STORAGE_KEY);
             }}
-            className="text-xs px-2.5 py-1 rounded-lg border bg-slate-800/60 text-slate-500 border-slate-700 hover:text-rose-300 hover:border-rose-500/40 transition-all"
+            className="text-xs px-2.5 py-1.5 rounded-xl border bg-slate-900/80 text-slate-400 border-slate-800 hover:text-rose-300 hover:border-rose-500/40 font-medium transition-all"
             title="Clear chat history"
           >
             🗑️ Clear
@@ -227,10 +234,10 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
           <button
             type="button"
             onClick={() => setVoiceEnabled(!voiceEnabled)}
-            className={`text-xs px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 ${
+            className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-all flex items-center gap-1.5 ${
               voiceEnabled
-                ? "bg-purple-600/20 text-purple-300 border-purple-500/40"
-                : "bg-slate-800/60 text-slate-500 border-slate-700"
+                ? "bg-purple-600/20 text-purple-300 border-purple-500/40 shadow-sm shadow-purple-500/20"
+                : "bg-slate-900/80 text-slate-500 border-slate-800"
             }`}
             title="Auto-read assistant responses using Speech Synthesis"
           >
@@ -244,10 +251,10 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
                 <button
                   key={p.id}
                   onClick={() => togglePaperSelection(p.id)}
-                  className={`text-xs px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${
+                  className={`text-xs px-2.5 py-1 rounded-xl border font-medium transition-all whitespace-nowrap ${
                     isSelected
-                      ? "bg-blue-600/30 text-blue-300 border-blue-500/50"
-                      : "bg-slate-800/60 text-slate-400 border-slate-700 hover:text-slate-200"
+                      ? "bg-blue-600/25 text-blue-300 border-blue-500/50 shadow-sm shadow-blue-500/10"
+                      : "bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200"
                   }`}
                 >
                   {p.title.slice(0, 18)}...
@@ -375,42 +382,47 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
         <div ref={scrollRef} />
       </div>
 
-      {/* Input Form with Push-to-Talk Mic */}
-      <form onSubmit={handleSubmit} className="p-4 bg-slate-900/80 border-t border-slate-800 flex gap-3 items-center">
+      {/* Input Dock with Push-to-Talk Mic & Model Badge */}
+      <form onSubmit={handleSubmit} className="p-4 bg-slate-950/80 border-t border-slate-800/80 flex gap-3 items-center z-10 backdrop-blur-md">
         {/* Push-to-Talk Microphone Button */}
         <button
           type="button"
           onClick={handleMicClick}
-          className={`p-3 rounded-xl border transition-all ${
+          className={`px-3.5 py-3 rounded-xl border transition-all text-xs font-semibold flex items-center gap-1.5 shrink-0 ${
             isListening
               ? "bg-rose-600 border-rose-500 text-white animate-pulse shadow-lg shadow-rose-600/30"
-              : "bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:border-purple-500/60"
+              : "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-purple-500/60"
           }`}
           title={isListening ? "Listening... Click to stop" : "Push-to-talk microphone"}
         >
-          {isListening ? "🎙️ Recording..." : "🎤"}
+          {isListening ? "🎙️ Recording..." : "🎤 Voice"}
         </button>
 
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder={isListening ? "Listening to your voice..." : "Ask a question, compare datasets, or generate a literature review... (Ctrl+Enter to send)"}
-          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60"
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-              e.preventDefault();
-              if (!loading && query.trim()) handleSubmit(e as any);
-            }
-          }}
-        />
+        <div className="flex-1 relative flex items-center">
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={isListening ? "Listening to your voice..." : "Ask a question across your papers, compare datasets, or query figures... (Ctrl+Enter to send)"}
+            className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-4 pr-24 py-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/60 shadow-inner"
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                if (!loading && query.trim()) handleSubmit(e as any);
+              }
+            }}
+          />
+          <div className="absolute right-3 hidden sm:flex items-center gap-1 pointer-events-none">
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">Ctrl+Enter</span>
+          </div>
+        </div>
 
         <button
           type="submit"
           disabled={loading || !query.trim()}
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 transition-all"
+          className="px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-blue-600/25 disabled:opacity-50 transition-all flex items-center gap-1.5 shrink-0"
         >
-          Send Query
+          <span>Send</span>
         </button>
       </form>
 
