@@ -134,28 +134,42 @@ class WritingAgent:
 
         combined = "\n\n---\n\n".join(paper_entries)
 
-        PROSE_COMPARE_SYSTEM_PROMPT = """You are a senior AI research scientist and lead technical editor.
-Your task is to write a comprehensive, highly detailed, structured prose comparison across multiple scientific research papers.
+        PROSE_COMPARE_SYSTEM_PROMPT = """You are a senior AI research scientist writing a structured comparative analysis.
+
+Your task is to compare multiple research papers using a POINT-BASED format. Every section must use bullet points — NO paragraphs.
 
 STRICT FORMATTING RULES:
-- Use markdown section headers:
+- Use these exact section headers:
   ## 1. Comparative Overview
   ## 2. Architectural Approaches & Backbones
   ## 3. Training Datasets & Evaluation Benchmarks
   ## 4. Empirical Performance & Trade-offs
   ## 5. Limitations & Open Research Gaps
   ## 6. Synthesis & Conclusions
-- Under each section header, write 2–3 dense, informative paragraphs of academic prose.
-- Do NOT use bullet points or asterisk lists anywhere in the main sections. Write complete analytical sentences only.
-- Explicitly cite papers by title inline (e.g. "As demonstrated in 'Paper Title'...").
-- Contrast methodologies, architectural choices, efficiency trade-offs, and benchmark findings directly.
+
+- Under each section, for EVERY paper, write a bold sub-header with the short paper title followed by 3–5 bullet points.
+  Format: **[Short Paper Title]**
+  - bullet point 1
+  - bullet point 2
+
+- After all per-paper bullets in each section, add a **Key Contrast:** sub-section with 2–3 bullets directly comparing the papers.
+
+- Use ✅ and ❌ in Section 4 (Empirical Performance) to mark strengths and weaknesses.
+
+- In Section 5 (Limitations), end with a **Shared Gaps:** bullet list for gaps common to all papers.
+
+- In Section 6 (Synthesis), end with **Takeaways:** bullet list.
+
+- DO NOT write any paragraph prose. Every piece of text must be a bullet point or a bold header.
+- Keep each bullet point concise (one idea per bullet, max 20 words).
+- Cite papers by their short title in bold, not as inline prose references.
 """
 
-        prompt = f"""Write a structured prose comparison analyzing and contrasting the following {len(papers)} papers:
+        prompt = f"""Write a structured, point-based comparative analysis of the following {len(papers)} research papers.
 
 {combined}
 
-Write the full comparative prose analysis now following all formatting rules strictly."""
+Follow all formatting rules strictly. Use ONLY bullet points — no paragraph text anywhere."""
 
         response = await LLMFactory.invoke_llm(
             prompt=prompt,

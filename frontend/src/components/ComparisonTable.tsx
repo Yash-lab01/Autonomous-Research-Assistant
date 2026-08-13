@@ -132,8 +132,9 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
 
   const handleSwitchViewMode = async (mode: "table" | "prose") => {
     setViewMode(mode);
-    if (mode === "prose" && !proseComparison && selectedPapers.length >= 2) {
+    if (mode === "prose" && selectedPapers.length >= 2) {
       setLoadingProse(true);
+      setProseComparison(null);
       try {
         const pids = selectedPapers.map((p) => p.id);
         const res = await fetchProseComparison(pids);
@@ -281,63 +282,7 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
             ))}
           </div>
 
-          {/* Figure Strip for Compared Papers */}
-          <div className="glass-panel rounded-2xl p-5 space-y-3 border border-purple-500/20">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-                🖼️ Key Architecture Diagrams & Figures Across Compared Papers
-              </h4>
-              {loadingFiguresMap && (
-                <span className="text-[10px] text-purple-400 animate-pulse font-mono">Loading diagrams...</span>
-              )}
-            </div>
 
-            <div className="flex items-stretch gap-4 overflow-x-auto custom-scrollbar pb-2">
-              {selectedPapers.map((p) => {
-                const figs = paperFiguresMap[p.id] || [];
-                const topFig = figs[0]; // first/key figure
-                return (
-                  <div key={p.id} className="min-w-[240px] max-w-[280px] shrink-0 glass-panel rounded-xl p-3 border border-slate-800 flex flex-col justify-between space-y-2">
-                    <div className="space-y-1">
-                      <p className="text-xs font-bold text-slate-200 line-clamp-1">{p.title}</p>
-                      <p className="text-[10px] text-slate-500 font-mono">arXiv:{p.arxiv_id}</p>
-                    </div>
-
-                    {topFig ? (
-                      <button
-                        onClick={() => setActiveLightboxFig({
-                          url: `${API_BASE}${topFig.url}`,
-                          caption: topFig.caption,
-                          paperTitle: p.title,
-                          pageNumber: topFig.page_number
-                        })}
-                        className="group relative w-full aspect-video rounded-lg overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center hover:border-purple-500 transition-colors"
-                      >
-                        <img
-                          src={`${API_BASE}${topFig.url}`}
-                          alt={topFig.caption}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1 text-[9px] font-mono text-purple-300">
-                          p. {topFig.page_number} {topFig.ai_captioned && "· 🤖 AI"}
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="w-full aspect-video rounded-lg border border-slate-800/60 bg-slate-950/40 flex items-center justify-center text-[10px] text-slate-600">
-                        No diagram extracted
-                      </div>
-                    )}
-
-                    {topFig && (
-                      <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug">
-                        {topFig.caption}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Detailed Comparison Container (Table vs Prose) */}
           <div className="glass-panel rounded-2xl overflow-hidden">
@@ -425,16 +370,70 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
 
             {/* Prose View Mode */}
             {viewMode === "prose" && (
-              <div className="p-8 max-w-4xl space-y-4">
+              <div className="p-6 space-y-6">
+                {/* Per-Paper Figure Strip */}
+                {selectedPapers.some(p => (paperFiguresMap[p.id] || []).length > 0) && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                      🖼️ Key Architecture Diagrams & Figures
+                      {loadingFiguresMap && <span className="text-[10px] text-purple-400 animate-pulse font-mono">Loading...</span>}
+                    </h4>
+                    <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${selectedPapers.length}, minmax(0, 1fr))` }}>
+                      {selectedPapers.map((p) => {
+                        const figs = paperFiguresMap[p.id] || [];
+                        return (
+                          <div key={p.id} className="space-y-2">
+                            <p className="text-[10px] font-bold text-blue-300 line-clamp-1 font-mono">{p.title.split(":")[0]}</p>
+                            {figs.length > 0 ? (
+                              <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                                {figs.slice(0, 3).map((fig, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setActiveLightboxFig({
+                                      url: `${API_BASE}${fig.url}`,
+                                      caption: fig.caption,
+                                      paperTitle: p.title,
+                                      pageNumber: fig.page_number
+                                    })}
+                                    className="group relative shrink-0 w-36 aspect-video rounded-lg overflow-hidden border border-slate-800 bg-slate-900 hover:border-purple-500/60 transition-colors"
+                                  >
+                                    <img
+                                      src={`${API_BASE}${fig.url}`}
+                                      alt={fig.caption}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-0.5 text-[8px] font-mono text-purple-300">
+                                      p.{fig.page_number}{fig.ai_captioned && " 🤖"}
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="w-full h-20 rounded-lg border border-slate-800/40 bg-slate-950/40 flex items-center justify-center text-[10px] text-slate-600">
+                                No figures extracted
+                              </div>
+                            )}
+                            {figs[0] && (
+                              <p className="text-[9px] text-slate-500 line-clamp-2 leading-snug italic">{figs[0].caption}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="border-t border-slate-800/60 pt-4" />
+                  </div>
+                )}
+
+                {/* Point-Based Analysis */}
                 {loadingProse ? (
                   <div className="flex items-center gap-3 p-6 glass-panel rounded-xl max-w-md text-slate-300 text-xs font-mono">
                     <span className="w-3 h-3 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" />
-                    Groq 70B generating structured prose comparison...
+                    Generating structured point-based comparison...
                   </div>
                 ) : proseComparison ? (
                   <MarkdownRenderer content={proseComparison} />
                 ) : (
-                  <div className="text-xs text-slate-500">Click Prose Analysis Mode to generate comparative narrative.</div>
+                  <div className="text-xs text-slate-500">Click 📝 Prose Analysis Mode to generate the structured comparison.</div>
                 )}
               </div>
             )}
