@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, AsyncGenerator
 from sqlalchemy.orm import Session
 from app.services.db import DatabaseService, SessionLocal
 from app.services.llm_factory import LLMFactory
@@ -23,28 +23,18 @@ STRICT FORMATTING RULES:
 class GapFinderAgent:
 
     @staticmethod
-    async def analyze_gaps(paper_ids: List[str] = None) -> Dict[str, Any]:
-        """
-        Scans limitations and future_work across papers to discover open research gaps.
-        """
-        logger.info("Running Research Gap Finder Agent...")
+    def _build_context(paper_ids: List[str] = None):
         db: Session = SessionLocal()
         all_papers = DatabaseService.list_papers(db)
         db.close()
 
-        # Filter done papers
         completed_papers = [p for p in all_papers if p.status.value == "done" or p.status == "done"]
         if paper_ids:
             completed_papers = [p for p in completed_papers if p.id in paper_ids]
 
         if not completed_papers:
-            return {
-                "paper_count": 0,
-                "gaps_markdown": "No completed papers found in your library. Add and ingest papers first to generate research gap insights.",
-                "insights": []
-            }
+            return None, []
 
-        # Build cross-paper synthesis context
         paper_blocks = []
         for p in completed_papers:
             sd = p.structured_data or {}
@@ -73,12 +63,39 @@ class GapFinderAgent:
             paper_blocks.append(block)
 
         formatted_papers = "\n\n".join(paper_blocks)
-
         prompt = f"""Synthesize open research gaps and novel project ideas across the following {len(completed_papers)} research papers in your knowledge base:
 
 {formatted_papers}
 
 Analyze these papers deeply and write a comprehensive Research Gap & Novel Innovation Report following all system prompt instructions strictly."""
+        return prompt, completed_papers
+
+    @staticmethod
+    async def analyze_gaps(paper_ids: List[str] = None) -> Dict[str, Any]:
+        """
+        Scans limitations and future_work across papers to discover open research gaps with caching.
+        """
+        logger.info("Running Research Gap Finder Agent...")
+        db: Session = SessionLocal()
+        cache_key = DatabaseService.compute_synthesis_cache_key("gaps", paper_ids or [])
+        cached = DatabaseService.get_cached_synthesis(db, cache_key)
+        db.close()
+
+        if cached:
+            logger.info("Returning cached research gaps analysis.")
+            return {
+                "paper_count": len(paper_ids or []),
+                "gaps_markdown": cached,
+                "cached": True
+            }
+
+        prompt, completed_papers = GapFinderAgent._build_context(paper_ids)
+        if not completed_papers:
+            return {
+                "paper_count": 0,
+                "gaps_markdown": "No completed papers found in your library. Add and ingest papers first to generate research gap insights.",
+                "insights": []
+            }
 
         analysis_text = await LLMFactory.invoke_llm(
             prompt=prompt,
@@ -87,8 +104,47 @@ Analyze these papers deeply and write a comprehensive Research Gap & Novel Innov
             temperature=0.4
         )
 
+        db = SessionLocal()
+        DatabaseService.save_cached_synthesis(db, cache_key, "gaps", analysis_text)
+        db.close()
+
         return {
             "paper_count": len(completed_papers),
             "gaps_markdown": analysis_text,
             "paper_titles": [p.title for p in completed_papers]
         }
+
+    @staticmethod
+    async def analyze_gaps_stream(paper_ids: List[str] = None) -> AsyncGenerator[str, None]:
+        """
+        Streams research gaps analysis token by token, saving to cache when completed.
+        """
+        db: Session = SessionLocal()
+        cache_key = DatabaseService.compute_synthesis_cache_key("gaps", paper_ids or [])
+        cached = DatabaseService.get_cached_synthesis(db, cache_key)
+        db.close()
+
+        if cached:
+            logger.info("Streaming cached research gaps analysis.")
+            yield cached
+            return
+
+        prompt, completed_papers = GapFinderAgent._build_context(paper_ids)
+        if not completed_papers:
+            yield "No completed papers found in your library. Add and ingest papers first to generate research gap insights."
+            return
+
+        accumulated = []
+        async for token in LLMFactory.stream_llm(
+            prompt=prompt,
+            system_prompt=GAP_SYSTEM_PROMPT,
+            temperature=0.4
+        ):
+            accumulated.append(token)
+            yield token
+
+        full_content = "".join(accumulated)
+        if full_content.strip():
+            db = SessionLocal()
+            DatabaseService.save_cached_synthesis(db, cache_key, "gaps", full_content)
+            db.close()

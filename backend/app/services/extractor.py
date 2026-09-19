@@ -7,14 +7,16 @@ from app.services.llm_factory import LLMFactory
 logger = logging.getLogger("ai_research_os.extractor")
 
 EXTRACTION_SYSTEM_PROMPT = """You are an expert scientific AI research paper analyzer.
-Your task is to extract structured JSON metadata from the provided research paper text.
+Your task is to extract structured JSON metadata and a dense research card from the provided research paper text.
 
 Return ONLY a valid JSON object matching this schema:
 {
   "title": "String title",
   "abstract": "Summary abstract of the paper",
   "primary_task": "Core research task (e.g. GraphRAG, Multi-Modal RAG, Code Generation)",
-  "methodology_summary": "Core algorithmic or architecture methodology proposed",
+  "methodology_summary": "Core algorithmic or architecture methodology proposed (1-2 dense paragraphs)",
+  "executive_summary": "Dense 150-word synthesis of problem, breakthrough, and results",
+  "key_findings": ["Core empirical finding 1 with numbers", "Core empirical finding 2"],
   "datasets_used": ["dataset_1", "dataset_2"],
   "backbone_models": ["model_1", "model_2"],
   "benchmark_metrics": { "accuracy": "91.2%", "latency": "45ms", "dataset_name": "metric_value" },

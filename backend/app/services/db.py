@@ -1,9 +1,10 @@
+import hashlib
 import json
 from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import settings
-from app.models.db_models import Base, PaperORM, ParagraphORM, FigureORM
+from app.models.db_models import Base, PaperORM, ParagraphORM, FigureORM, CachedSynthesisORM
 from app.models.paper import PaperMetadata, PaperStatus, ParagraphChunk, StructuredPaperExtraction
 
 engine = create_engine(
@@ -180,3 +181,28 @@ class DatabaseService:
             FigureORM.paper_id == paper_id,
             FigureORM.page_number.in_(page_numbers)
         ).all()
+
+    @staticmethod
+    def compute_synthesis_cache_key(task_type: str, paper_ids: List[str], extra: str = "") -> str:
+        sorted_ids = ",".join(sorted(paper_ids or []))
+        raw = f"{task_type}:{sorted_ids}:{extra}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def get_cached_synthesis(db: Session, cache_key: str) -> Optional[str]:
+        entry = db.query(CachedSynthesisORM).filter(CachedSynthesisORM.cache_key == cache_key).first()
+        return entry.content if entry else None
+
+    @staticmethod
+    def save_cached_synthesis(db: Session, cache_key: str, task_type: str, content: str):
+        existing = db.query(CachedSynthesisORM).filter(CachedSynthesisORM.cache_key == cache_key).first()
+        if existing:
+            existing.content = content
+        else:
+            new_entry = CachedSynthesisORM(
+                cache_key=cache_key,
+                task_type=task_type,
+                content=content
+            )
+            db.add(new_entry)
+        db.commit()

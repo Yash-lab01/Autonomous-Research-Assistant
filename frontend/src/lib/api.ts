@@ -291,3 +291,143 @@ export async function fetchCombinedSummary(paperIds: string[], topic?: string): 
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+/**
+ * Generic helper to consume Server-Sent Events (SSE) token streams
+ */
+export async function streamSSE(
+  url: string,
+  body: any,
+  onToken: (token: string) => void,
+  onDone?: () => void,
+  onError?: (err: Error) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("Response body is not readable");
+
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed === "data: [DONE]") {
+          if (onDone) onDone();
+          return;
+        }
+        if (trimmed.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            if (data.token) {
+              onToken(data.token);
+            } else if (data.error) {
+              throw new Error(data.error);
+            }
+          } catch (e: any) {
+            if (e.message && !e.message.includes("JSON")) {
+              throw e;
+            }
+          }
+        }
+      }
+    }
+
+    if (onDone) onDone();
+  } catch (err: any) {
+    if (signal?.aborted) return;
+    if (onError) onError(err);
+    else throw err;
+  }
+}
+
+export function streamProseComparison(
+  paperIds: string[] | undefined,
+  onToken: (token: string) => void,
+  onDone?: () => void,
+  onError?: (err: Error) => void,
+  signal?: AbortSignal
+) {
+  return streamSSE(
+    `${API_BASE_URL}/api/compare/prose/stream`,
+    { paper_ids: paperIds || null },
+    onToken,
+    onDone,
+    onError,
+    signal
+  );
+}
+
+export function streamSinglePaperSummary(
+  paperId: string,
+  onToken: (token: string) => void,
+  onDone?: () => void,
+  onError?: (err: Error) => void,
+  signal?: AbortSignal
+) {
+  return streamSSE(
+    `${API_BASE_URL}/api/summary/paper/stream`,
+    { paper_id: paperId },
+    onToken,
+    onDone,
+    onError,
+    signal
+  );
+}
+
+export function streamCombinedSummary(
+  paperIds: string[],
+  topic: string | undefined,
+  onToken: (token: string) => void,
+  onDone?: () => void,
+  onError?: (err: Error) => void,
+  signal?: AbortSignal
+) {
+  return streamSSE(
+    `${API_BASE_URL}/api/summary/combined/stream`,
+    { paper_ids: paperIds, topic: topic || null },
+    onToken,
+    onDone,
+    onError,
+    signal
+  );
+}
+
+export function streamResearchGaps(
+  paperIds: string[] | undefined,
+  onToken: (token: string) => void,
+  onDone?: () => void,
+  onError?: (err: Error) => void,
+  signal?: AbortSignal
+) {
+  return streamSSE(
+    `${API_BASE_URL}/api/gaps/stream`,
+    { paper_ids: paperIds || null },
+    onToken,
+    onDone,
+    onError,
+    signal
+  );
+}
+

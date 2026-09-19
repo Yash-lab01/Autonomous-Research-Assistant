@@ -328,6 +328,89 @@ async def generate_combined_summary(req: CombinedSummaryRequest):
     return {"topic": req.topic, "paper_ids": req.paper_ids, "summary": summary}
 
 
+# -------------------------------------------------------------
+# REAL-TIME TOKEN STREAMING SSE ENDPOINTS (PHASE 1)
+# -------------------------------------------------------------
+
+@app.post("/api/compare/prose/stream")
+async def stream_prose_comparison(req: ProseCompareRequest):
+    """
+    Real-time SSE token stream for structured prose comparison across papers.
+    """
+    async def event_generator():
+        try:
+            async for token in WritingAgent.generate_prose_comparison_stream(req.paper_ids):
+                payload = json.dumps({"token": token})
+                yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Prose comparison stream error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@app.post("/api/summary/paper/stream")
+async def stream_single_paper_summary(req: SinglePaperSummaryRequest):
+    """
+    Real-time SSE token stream for deep technical per-paper summary.
+    """
+    async def event_generator():
+        try:
+            async for token in WritingAgent.generate_paper_summary_stream(req.paper_id):
+                payload = json.dumps({"token": token})
+                yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Paper summary stream error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@app.post("/api/summary/combined/stream")
+async def stream_combined_summary(req: CombinedSummaryRequest):
+    """
+    Real-time SSE token stream for multi-paper synthesis summary.
+    """
+    async def event_generator():
+        try:
+            async for token in WritingAgent.generate_combined_summary_stream(req.paper_ids, req.topic):
+                payload = json.dumps({"token": token})
+                yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Combined summary stream error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+
 @app.get("/api/papers/{paper_id}")
 def get_paper_details(paper_id: str, db: Session = Depends(get_db)):
     paper = DatabaseService.get_paper_by_id(db, paper_id)
@@ -553,6 +636,41 @@ async def analyze_research_gaps(paper_ids: Optional[List[str]] = Query(None)):
     """
     result = await GapFinderAgent.analyze_gaps(paper_ids=paper_ids)
     return result
+
+class GapStreamRequest(BaseModel):
+    paper_ids: Optional[List[str]] = None
+
+@app.post("/api/gaps/stream")
+@app.get("/api/gaps/stream")
+async def stream_research_gaps(
+    paper_ids: Optional[List[str]] = Query(None),
+    req: Optional[GapStreamRequest] = None
+):
+    """
+    Real-time SSE token stream for open research gaps analysis.
+    """
+    active_ids = paper_ids or (req.paper_ids if req else None)
+
+    async def event_generator():
+        try:
+            async for token in GapFinderAgent.analyze_gaps_stream(active_ids):
+                payload = json.dumps({"token": token})
+                yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Gaps stream error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 
 @app.get("/api/timeline")
 def get_research_timeline(

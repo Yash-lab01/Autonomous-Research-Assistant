@@ -43,11 +43,12 @@ Each phase is grouped logically with a clear objective, actionable checklist, te
 
 **Goal:** Eliminate the 5-second initial delay on synthesis tools, prevent Groq 413/429 rate-limit crashes, and make answers begin rendering in under 250ms.
 
-### 📋 Phase 1 Checklist
-- [ ] **1.1 True Server-Sent Events (SSE) Streaming for Synthesis Endpoints**
-- [ ] **1.2 Persistent HTTP Connection Pooling for Groq Cloud API**
-- [ ] **1.3 Content-Hash In-Memory & SQLite Synthesis Caching**
-- [ ] **1.4 Hierarchical Ingestion & Database Research Cards (Solution 2)**
+### 📋 Phase 1 Checklist (Completed & Verified)
+- [x] **1.1 True Server-Sent Events (SSE) Streaming for Synthesis Endpoints**
+- [x] **1.2 Persistent HTTP Connection Pooling for Groq Cloud API**
+- [x] **1.3 Content-Hash In-Memory & SQLite Synthesis Caching**
+- [x] **1.4 Hierarchical Ingestion & Database Research Cards (Solution 2)**
+
 
 ---
 

@@ -92,3 +92,13 @@ class FigureORM(Base):
     caption = Column(Text, nullable=True)
     ai_captioned = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CachedSynthesisORM(Base):
+    __tablename__ = "cached_syntheses"
+
+    cache_key = Column(String, primary_key=True, index=True)
+    task_type = Column(String, index=True, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

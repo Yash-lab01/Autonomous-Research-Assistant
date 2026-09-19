@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem, fetchSinglePaperSummary, fetchCombinedSummary, fetchPaperFigures, PaperFigure } from "@/lib/api";
+import { PaperItem, fetchSinglePaperSummary, fetchCombinedSummary, streamSinglePaperSummary, streamCombinedSummary, fetchPaperFigures, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
 
@@ -64,23 +64,33 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
   const handleGenerateSingle = async (paperId: string) => {
     setGenerating(true);
     setMode("single");
-    setSummaryContent(null);
+    setSummaryContent("");
     setAllFigures([]);
 
-    try {
-      const res = await fetchSinglePaperSummary(paperId);
-      setSummaryContent(res.summary);
-
-      const paper = completedPapers.find(p => p.id === paperId);
-      const figRes = await fetchPaperFigures(paperId);
+    // Parallel fetch figures
+    const paper = completedPapers.find(p => p.id === paperId);
+    fetchPaperFigures(paperId).then(figRes => {
       if (figRes.figures) {
         const figs = figRes.figures.map(f => ({ paperTitle: paper?.title || "Paper", figure: f }));
         setAllFigures(figs);
         setSelectedFigureIds(new Set(figRes.figures.map(f => f.figure_id)));
       }
+    }).catch(() => {});
+
+    try {
+      await streamSinglePaperSummary(
+        paperId,
+        (token) => {
+          setSummaryContent((prev) => (prev || "") + token);
+        },
+        () => setGenerating(false),
+        (err) => {
+          setSummaryContent((prev) => prev ? prev + `\n\n⚠️ Error: ${err.message}` : `⚠️ Error generating summary: ${err.message}`);
+          setGenerating(false);
+        }
+      );
     } catch (e: any) {
       setSummaryContent(`⚠️ Error generating summary: ${e.message || e}`);
-    } finally {
       setGenerating(false);
     }
   };
@@ -89,38 +99,50 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
     if (selectedPapers.length < 2) return;
     setGenerating(true);
     setMode("combined");
-    setSummaryContent(null);
+    setSummaryContent("");
     setAllFigures([]);
+
+    // Parallel fetch figures
+    const figsList: { paperTitle: string; figure: PaperFigure }[] = [];
+    const defaultSelected = new Set<string>();
+
+    Promise.all(
+      selectedPapers.map(async (paper) => {
+        try {
+          const figRes = await fetchPaperFigures(paper.id);
+          if (figRes.figures) {
+            figRes.figures.forEach((fig) => {
+              figsList.push({ paperTitle: paper.title, figure: fig });
+              defaultSelected.add(fig.figure_id);
+            });
+          }
+        } catch (err) {}
+      })
+    ).then(() => {
+      setAllFigures(figsList);
+      setSelectedFigureIds(defaultSelected);
+    });
 
     try {
       const pids = selectedPapers.map(p => p.id);
-      const res = await fetchCombinedSummary(pids, customTopic || undefined);
-      setSummaryContent(res.summary);
-
-      const figsList: { paperTitle: string; figure: PaperFigure }[] = [];
-      const defaultSelected = new Set<string>();
-
-      await Promise.all(
-        selectedPapers.map(async (paper) => {
-          try {
-            const figRes = await fetchPaperFigures(paper.id);
-            if (figRes.figures) {
-              figRes.figures.forEach((fig) => {
-                figsList.push({ paperTitle: paper.title, figure: fig });
-                defaultSelected.add(fig.figure_id);
-              });
-            }
-          } catch (err) {}
-        })
+      await streamCombinedSummary(
+        pids,
+        customTopic || undefined,
+        (token) => {
+          setSummaryContent((prev) => (prev || "") + token);
+        },
+        () => setGenerating(false),
+        (err) => {
+          setSummaryContent((prev) => prev ? prev + `\n\n⚠️ Error: ${err.message}` : `⚠️ Error generating combined summary: ${err.message}`);
+          setGenerating(false);
+        }
       );
-      setAllFigures(figsList);
-      setSelectedFigureIds(defaultSelected);
     } catch (e: any) {
       setSummaryContent(`⚠️ Error generating combined summary: ${e.message || e}`);
-    } finally {
       setGenerating(false);
     }
   };
+
 
   const toggleFigureSelection = (figId: string) => {
     setSelectedFigureIds((prev) => {

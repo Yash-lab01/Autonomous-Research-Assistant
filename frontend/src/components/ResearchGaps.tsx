@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem, fetchResearchGaps } from "@/lib/api";
+import { PaperItem, fetchResearchGaps, streamResearchGaps } from "@/lib/api";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
 
 interface ResearchGapsProps {
@@ -78,18 +78,29 @@ export default function ResearchGaps({ papers }: ResearchGapsProps) {
 
   const handleRunAnalysis = async () => {
     setAnalyzing(true);
-    setReportMarkdown(null);
+    setReportMarkdown("");
     try {
       const targetIds = selectedIds.length > 0 ? selectedIds : undefined;
-      const res = await fetchResearchGaps(targetIds);
-      setReportMarkdown(res.gaps_markdown);
-      setPaperCount(res.paper_count);
+      setPaperCount(targetIds ? targetIds.length : completedPapers.length);
+      await streamResearchGaps(
+        targetIds,
+        (token) => {
+          setReportMarkdown((prev) => (prev || "") + token);
+        },
+        () => setAnalyzing(false),
+        (err) => {
+          setReportMarkdown((prev) =>
+            prev ? prev + `\n\n⚠️ Error: ${err.message}` : `⚠️ Error running gap analysis: ${err.message}`
+          );
+          setAnalyzing(false);
+        }
+      );
     } catch (err: any) {
       setReportMarkdown(`⚠️ Error running gap analysis: ${err.message || err}`);
-    } finally {
       setAnalyzing(false);
     }
   };
+
 
   const handleCopy = () => {
     if (!reportMarkdown) return;

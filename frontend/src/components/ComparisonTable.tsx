@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem, getExportComparisonCSVUrl, fetchProseComparison, fetchPaperFigures, PaperFigure } from "@/lib/api";
+import { PaperItem, getExportComparisonCSVUrl, fetchProseComparison, streamProseComparison, fetchPaperFigures, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
 
@@ -135,18 +135,29 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
     setViewMode(mode);
     if (mode === "prose" && selectedPapers.length >= 2) {
       setLoadingProse(true);
-      setProseComparison(null);
+      setProseComparison("");
       try {
         const pids = selectedPapers.map((p) => p.id);
-        const res = await fetchProseComparison(pids);
-        setProseComparison(res.prose);
+        await streamProseComparison(
+          pids,
+          (token) => {
+            setProseComparison((prev) => (prev || "") + token);
+          },
+          () => setLoadingProse(false),
+          (err) => {
+            setProseComparison((prev) =>
+              prev ? prev + `\n\n⚠️ Stream error: ${err.message}` : `⚠️ Failed to generate prose comparison: ${err.message}`
+            );
+            setLoadingProse(false);
+          }
+        );
       } catch (err: any) {
         setProseComparison(`⚠️ Failed to generate prose comparison: ${err.message || err}`);
-      } finally {
         setLoadingProse(false);
       }
     }
   };
+
 
   // Auto-fetch figures when papers selection changes and at least 2 are selected
   React.useEffect(() => {
@@ -426,16 +437,17 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                 )}
 
                 {/* Point-Based Analysis */}
-                {loadingProse ? (
+                {proseComparison ? (
+                  <StreamedMarkdown content={proseComparison} isGenerating={loadingProse} />
+                ) : loadingProse ? (
                   <div className="flex items-center gap-3 p-6 glass-panel rounded-xl max-w-md text-slate-300 text-xs font-mono">
                     <span className="w-3 h-3 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" />
-                    Generating structured point-based comparison...
+                    Connecting to real-time synthesis stream...
                   </div>
-                ) : proseComparison ? (
-                  <StreamedMarkdown content={proseComparison} isGenerating={loadingProse} />
                 ) : (
                   <div className="text-xs text-slate-500">Click 📝 Prose Analysis Mode to generate the structured comparison.</div>
                 )}
+
               </div>
             )}
           </div>

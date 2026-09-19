@@ -25,6 +25,8 @@ class StructuredPaperExtraction(BaseModel):
     abstract: str = Field(description="Abstract summary")
     primary_task: str = Field(description="Primary research task or problem domain")
     methodology_summary: str = Field(description="Core methodology or algorithmic approach proposed")
+    executive_summary: Optional[str] = Field(default=None, description="Concise 150-word synthesis of contributions")
+    key_findings: List[str] = Field(default_factory=list, description="Core factual and empirical findings")
     datasets_used: List[str] = Field(default_factory=list, description="Datasets evaluated on")
     backbone_models: List[str] = Field(default_factory=list, description="Base/backbone LLM or vision architectures used")
     benchmark_metrics: Dict[str, Any] = Field(default_factory=dict, description="Quantitative benchmark accuracy, FLOPs, latency")
