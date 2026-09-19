@@ -109,3 +109,89 @@ Provide the output strictly as a valid JSON object."""
                 future_work=[],
                 bibtex=f"@article{{{key},\n  title={{{title}}},\n  year={{2026}}\n}}"
             )
+
+    @staticmethod
+    async def extract_custom_attribute(
+        paper_id: str,
+        paper_title: str,
+        attribute_name: str,
+        query_prompt: Optional[str] = None
+    ) -> dict:
+        """
+        Dynamically extracts a specific custom question or attribute from paper paragraphs
+        using hybrid vector retrieval and targeted LLM extraction (Elicit.org parity).
+        """
+        from app.services.vector_store import vector_store
+
+        search_query = f"{attribute_name} {query_prompt or ''}".strip()
+        matched_chunks = []
+        try:
+            matched_chunks = vector_store.search_paragraphs(
+                query=search_query,
+                top_k=4,
+                paper_ids=[paper_id]
+            )
+        except Exception as e:
+            logger.warning(f"Vector search failed for custom attribute on paper {paper_id}: {e}")
+
+        excerpts = "\n\n".join(
+            f"[Page {c.get('page_number', '?')}]: {c.get('text', '')}"
+            for c in matched_chunks
+        ) if matched_chunks else "No direct text chunks matched."
+
+        prompt = f"""PAPER: {paper_title}
+TARGET ATTRIBUTE / QUESTION: {attribute_name}
+ADDITIONAL CLARIFICATION: {query_prompt or 'Extract the exact specific detail or metric requested.'}
+
+PAPER EXCERPTS:
+{excerpts[:4000]}
+
+Extract the exact value for this attribute. Return ONLY a valid JSON object matching this schema:
+{{
+  "value": "Concise specific value (e.g. '8x NVIDIA A100 80GB', 'AdamW, lr=1e-4', '4096 tokens', '15,000 samples'). If not mentioned, state 'Not reported'.",
+  "confidence": 0.85,
+  "page_number": 4,
+  "excerpt": "Verbatim short sentence or phrase from the paper where this was found."
+}}"""
+
+        try:
+            raw = await LLMFactory.invoke_llm(
+                prompt=prompt,
+                system_prompt="You are a precise scientific data extraction assistant. Return only valid JSON.",
+                workload_type="interactive",
+                response_format="json_object",
+                temperature=0.1
+            )
+            cleaned = raw.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            data = json.loads(cleaned.strip())
+
+            val = data.get("value", "Not reported")
+            conf = float(data.get("confidence", 0.7))
+            page = data.get("page_number") or (matched_chunks[0].get("page_number") if matched_chunks else None)
+            excerpt = data.get("excerpt", "")
+
+            return {
+                "paper_id": paper_id,
+                "attribute_name": attribute_name,
+                "value": val,
+                "confidence": round(conf, 2),
+                "page_number": page,
+                "excerpt": excerpt
+            }
+        except Exception as err:
+            logger.error(f"Error extracting custom attribute '{attribute_name}' for {paper_id}: {err}")
+            return {
+                "paper_id": paper_id,
+                "attribute_name": attribute_name,
+                "value": "Extraction unavailable",
+                "confidence": 0.0,
+                "page_number": None,
+                "excerpt": ""
+            }
+

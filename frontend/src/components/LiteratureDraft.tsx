@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { exportCitations, fetchPaperFigures, PaperItem, PaperFigure } from "@/lib/api";
+import {
+  exportCitations,
+  fetchPaperFigures,
+  PaperItem,
+  PaperFigure,
+  exportLatexSurvey,
+  downloadLatexZip,
+  LatexExportResult
+} from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
 
@@ -147,7 +155,73 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
   const [loadingFigures, setLoadingFigures] = useState(false);
   const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; paperTitle: string; pageNumber: number } | null>(null);
 
+  // LaTeX & Overleaf export state (Phase 4)
+  const [showLatexModal, setShowLatexModal] = useState(false);
+  const [latexResult, setLatexResult] = useState<LatexExportResult | null>(null);
+  const [loadingLatex, setLoadingLatex] = useState(false);
+  const [latexTab, setLatexTab] = useState<"tex" | "bib">("tex");
+  const [latexStyle, setLatexStyle] = useState<"ieee" | "generic">("ieee");
+  const [copiedLatex, setCopiedLatex] = useState(false);
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const handleOpenLatexExport = async (styleOverride?: "ieee" | "generic") => {
+    if (selectedPapers.length === 0) return;
+    const style = styleOverride || latexStyle;
+    setShowLatexModal(true);
+    setLoadingLatex(true);
+    try {
+      const res = await exportLatexSurvey(
+        selectedPapers.map((p) => p.id),
+        topic || "Academic Literature Survey",
+        reviewContent || "",
+        style
+      );
+      setLatexResult(res);
+    } catch (err) {
+      console.error("LaTeX export failed:", err);
+    } finally {
+      setLoadingLatex(false);
+    }
+  };
+
+  const handleDownloadLatexZip = async () => {
+    if (selectedPapers.length === 0) return;
+    try {
+      await downloadLatexZip(
+        selectedPapers.map((p) => p.id),
+        topic || "Academic Literature Survey",
+        reviewContent || "",
+        latexStyle
+      );
+    } catch (err: any) {
+      alert(`Download failed: ${err.message || err}`);
+    }
+  };
+
+  const handleOpenInOverleaf = () => {
+    if (!latexResult) return;
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "https://www.overleaf.com/docs";
+    form.target = "_blank";
+
+    const snip = document.createElement("input");
+    snip.type = "hidden";
+    snip.name = "snip";
+    snip.value = latexResult.main_tex;
+    form.appendChild(snip);
+
+    const snipName = document.createElement("input");
+    snipName.type = "hidden";
+    snipName.name = "snip_name";
+    snipName.value = "main.tex";
+    form.appendChild(snipName);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  };
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -452,6 +526,13 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
               >
                 🖨️ Save as PDF
               </button>
+              <button
+                onClick={() => handleOpenLatexExport()}
+                className="px-3.5 py-1.5 rounded-lg bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Export complete IEEE/ACM formatted LaTeX survey bundle and open in Overleaf"
+              >
+                <span>📑</span> Export LaTeX / Overleaf
+              </button>
             </div>
           </div>
 
@@ -596,6 +677,139 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
           </div>
         </div>
       )}
+
+      {/* LaTeX & Overleaf Export Modal (Phase 4) */}
+      {showLatexModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="glass-panel max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col border border-purple-500/40 shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📑</span>
+                <div>
+                  <h4 className="font-bold text-slate-100 text-base">Academic LaTeX & Overleaf Survey Bundle</h4>
+                  <p className="text-xs text-slate-400">
+                    Compilable manuscript with structured IEEE/ACM document classes & BibTeX citations
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLatexModal(false)}
+                className="text-slate-400 hover:text-white px-3 py-1 rounded-lg bg-slate-800 text-xs font-semibold border border-slate-700 cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Template Style Switcher */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-400">Document Class:</span>
+                <button
+                  onClick={() => {
+                    setLatexStyle("ieee");
+                    handleOpenLatexExport("ieee");
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    latexStyle === "ieee"
+                      ? "bg-purple-600 text-white shadow"
+                      : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                  }`}
+                >
+                  IEEE Journal (CompSoc)
+                </button>
+                <button
+                  onClick={() => {
+                    setLatexStyle("generic");
+                    handleOpenLatexExport("generic");
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    latexStyle === "generic"
+                      ? "bg-purple-600 text-white shadow"
+                      : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                  }`}
+                >
+                  Standard Article (ACM / NeurIPS)
+                </button>
+              </div>
+
+              {/* Code Tab Switcher */}
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setLatexTab("tex")}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer ${
+                    latexTab === "tex" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  main.tex
+                </button>
+                <button
+                  onClick={() => setLatexTab("bib")}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer ${
+                    latexTab === "bib" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  references.bib
+                </button>
+              </div>
+            </div>
+
+            {/* Code Content Container */}
+            <div className="flex-1 min-h-[300px] max-h-[50vh] overflow-auto bg-slate-950 rounded-xl p-4 border border-slate-800 font-mono text-xs text-slate-300 relative group">
+              {loadingLatex ? (
+                <div className="flex items-center justify-center h-48 text-slate-500 font-sans text-xs space-y-2">
+                  <div className="text-center space-y-2">
+                    <span className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin inline-block" />
+                    <p>Compiling LaTeX document & BibTeX keys...</p>
+                  </div>
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap select-all leading-relaxed">
+                  {latexTab === "tex" ? latexResult?.main_tex : latexResult?.references_bib}
+                </pre>
+              )}
+            </div>
+
+            {/* Modal Bottom Actions */}
+            <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-slate-800">
+              <span className="text-xs text-slate-400 font-mono">
+                {selectedPapers.length} papers referenced · Ready to compile
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const textToCopy = latexTab === "tex" ? latexResult?.main_tex : latexResult?.references_bib;
+                    if (textToCopy) {
+                      navigator.clipboard.writeText(textToCopy);
+                      setCopiedLatex(true);
+                      setTimeout(() => setCopiedLatex(false), 2000);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {copiedLatex ? <span>✓ Copied</span> : <span>📋 Copy {latexTab === "tex" ? "LaTeX" : "BibTeX"}</span>}
+                </button>
+
+                <button
+                  onClick={handleDownloadLatexZip}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-md shadow-blue-900/30 cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>📥</span> Download Compilable ZIP (.tex + .bib)
+                </button>
+
+                <button
+                  onClick={handleOpenInOverleaf}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/30 cursor-pointer flex items-center gap-1.5"
+                  title="Directly opens Overleaf with this LaTeX survey document loaded"
+                >
+                  <span>🚀</span> Open in Overleaf
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

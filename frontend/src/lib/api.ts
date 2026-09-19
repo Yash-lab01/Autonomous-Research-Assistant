@@ -471,4 +471,219 @@ export async function askFigureQuestion(
   return res.json();
 }
 
+// ============================================================================
+// PHASE 4: PLATFORM PARITY TYPES & API METHODS
+// ============================================================================
+
+export interface PaperStance {
+  paper_id: string;
+  paper_title: string;
+  arxiv_id?: string;
+  stance: "supports" | "contradicts" | "nuanced" | "neutral";
+  confidence: number;
+  takeaway: string;
+  supporting_quote: string;
+  page_number?: number;
+  relevance_score?: number;
+}
+
+export interface ConsensusResult {
+  query: string;
+  total_papers: number;
+  analyzed_papers: number;
+  supports_count: number;
+  contradicts_count: number;
+  nuanced_count: number;
+  neutral_count: number;
+  supports_pct: number;
+  contradicts_pct: number;
+  nuanced_pct: number;
+  consensus_verdict: string;
+  paper_stances: PaperStance[];
+}
+
+export async function fetchConsensus(query: string, paperIds?: string[]): Promise<ConsensusResult> {
+  const res = await fetch(`${API_BASE_URL}/api/consensus`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, paper_ids: paperIds || null })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function streamConsensus(
+  query: string,
+  paperIds: string[] | undefined,
+  onEvent: (data: any) => void,
+  onDone: () => void,
+  onError: (err: Error) => void
+): Promise<() => void> {
+  const controller = new AbortController();
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/consensus/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, paper_ids: paperIds || null }),
+      signal: controller.signal
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    (async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const raw = line.slice(6).trim();
+              if (raw) {
+                try {
+                  const parsed = JSON.parse(raw);
+                  onEvent(parsed);
+                } catch {}
+              }
+            }
+          }
+        }
+        onDone();
+      } catch (err: any) {
+        if (err.name !== "AbortError") onError(err);
+      }
+    })();
+  } catch (err: any) {
+    onError(err);
+  }
+  return () => controller.abort();
+}
+
+export interface CustomColumnExtraction {
+  paper_id: string;
+  attribute_name: string;
+  value: string;
+  confidence: number;
+  page_number?: number;
+  excerpt?: string;
+}
+
+export async function extractCustomColumn(
+  paperIds: string[],
+  columnName: string,
+  queryPrompt?: string
+): Promise<{ column_name: string; extractions: Record<string, CustomColumnExtraction> }> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/extract-column`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paper_ids: paperIds,
+      column_name: columnName,
+      query_prompt: queryPrompt || null
+    })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface CitationGraphNode {
+  id: string;
+  title: string;
+  arxiv_id?: string;
+  authors?: string[];
+  year: string;
+  primary_task: string;
+  in_degree: number;
+  out_degree: number;
+  total_degree: number;
+  is_landmark: boolean;
+  pdf_url?: string;
+  summary?: string;
+}
+
+export interface CitationGraphEdge {
+  source: string;
+  target: string;
+  type: "cites" | "co_citation";
+  label: string;
+  weight: number;
+}
+
+export interface CitationGraphData {
+  nodes: CitationGraphNode[];
+  edges: CitationGraphEdge[];
+  clusters: string[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export async function fetchCitationGraph(paperIds?: string[]): Promise<CitationGraphData> {
+  const query = paperIds && paperIds.length > 0 ? `?${paperIds.map(id => `paper_ids=${encodeURIComponent(id)}`).join("&")}` : "";
+  const res = await fetch(`${API_BASE_URL}/api/citations/graph${query}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface LatexExportResult {
+  title: string;
+  main_tex: string;
+  references_bib: string;
+  paper_count: number;
+}
+
+export async function exportLatexSurvey(
+  paperIds: string[],
+  topic?: string,
+  reviewText?: string,
+  formatStyle: string = "ieee"
+): Promise<LatexExportResult> {
+  const res = await fetch(`${API_BASE_URL}/api/export/latex`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paper_ids: paperIds,
+      topic: topic || null,
+      review_text: reviewText || null,
+      format_style: formatStyle
+    })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function downloadLatexZip(
+  paperIds: string[],
+  topic?: string,
+  reviewText?: string,
+  formatStyle: string = "ieee"
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/export/latex/zip`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paper_ids: paperIds,
+      topic: topic || null,
+      review_text: reviewText || null,
+      format_style: formatStyle
+    })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `latex_survey_${new Date().toISOString().slice(0, 10)}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+
 

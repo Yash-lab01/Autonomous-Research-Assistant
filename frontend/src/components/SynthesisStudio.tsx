@@ -6,12 +6,14 @@ import ComparisonTable from "@/components/ComparisonTable";
 import PaperSummary from "@/components/PaperSummary";
 import LiteratureDraft from "@/components/LiteratureDraft";
 import ResearchGaps from "@/components/ResearchGaps";
+import ConsensusMeter from "@/components/ConsensusMeter";
+import CitationGraph from "@/components/CitationGraph";
 
 interface SynthesisStudioProps {
   papers: PaperItem[];
 }
 
-type StudioMode = "compare" | "summary" | "review" | "gaps";
+type StudioMode = "compare" | "summary" | "review" | "gaps" | "consensus" | "graph";
 
 const STUDIO_MODES: {
   id: StudioMode;
@@ -23,7 +25,19 @@ const STUDIO_MODES: {
     id: "compare",
     icon: "📊",
     label: "Comparison Matrix",
-    desc: "Side-by-side taxonomy matrix & point-based contrast",
+    desc: "Side-by-side taxonomy matrix & custom dynamic extraction columns",
+  },
+  {
+    id: "consensus",
+    icon: "⚖️",
+    label: "Consensus Meter",
+    desc: "Hypothesis polarity analysis & evidence agreement breakdown (Consensus.app Parity)",
+  },
+  {
+    id: "graph",
+    icon: "🕸️",
+    label: "Citation Graph",
+    desc: "2D force-directed citation lineage & co-citation network (Connected Papers Parity)",
   },
   {
     id: "summary",
@@ -35,7 +49,7 @@ const STUDIO_MODES: {
     id: "review",
     icon: "📝",
     label: "Literature Review",
-    desc: "Autonomous academic survey draft with formatted citation export",
+    desc: "Academic survey draft with Overleaf & LaTeX .zip export",
   },
   {
     id: "gaps",
@@ -77,7 +91,7 @@ export default function SynthesisStudio({ papers }: SynthesisStudioProps) {
                 <button
                   key={mode.id}
                   onClick={() => setActiveMode(mode.id)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     isSelected
                       ? "bg-blue-600 text-white font-semibold shadow-sm"
                       : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
@@ -95,6 +109,8 @@ export default function SynthesisStudio({ papers }: SynthesisStudioProps) {
       {/* Active Mode Render */}
       <div className="min-h-[500px]">
         {activeMode === "compare" && <ComparisonTable papers={papers} />}
+        {activeMode === "consensus" && <ConsensusMeter papers={papers} />}
+        {activeMode === "graph" && <CitationGraph papers={papers} />}
         {activeMode === "summary" && <PaperSummary papers={papers} />}
         {activeMode === "review" && <LiteratureDraft papers={papers} />}
         {activeMode === "gaps" && <ResearchGaps papers={papers} />}

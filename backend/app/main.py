@@ -854,3 +854,125 @@ async def get_digest_summary(db: Session = Depends(get_db)):
         ],
         "research_gaps_report": gaps.get("gaps_markdown", "")
     }
+
+
+# ============================================================================
+# PHASE 4: PLATFORM PARITY ENDPOINTS (Consensus, Custom Extraction, Graph, LaTeX)
+# ============================================================================
+
+from app.services.consensus import ConsensusService
+from app.services.extractor import PaperExtractor
+from app.services.citation_graph import CitationGraphService
+from app.services.latex_exporter import LaTeXExporter
+
+class ConsensusRequest(BaseModel):
+    query: str
+    paper_ids: Optional[List[str]] = None
+
+@app.post("/api/consensus")
+async def get_literature_consensus(req: ConsensusRequest, db: Session = Depends(get_db)):
+    """
+    Consensus Meter & Polarity Scorer (Consensus.app parity):
+    Classifies paper stances into Supports / Contradicts / Nuanced with confidence & citations.
+    """
+    res = await ConsensusService.analyze_consensus(db, req.query, req.paper_ids)
+    return res.model_dump()
+
+@app.post("/api/consensus/stream")
+async def stream_literature_consensus(req: ConsensusRequest, db: Session = Depends(get_db)):
+    """
+    Real-time SSE event stream for Consensus Meter classification.
+    """
+    return StreamingResponse(
+        ConsensusService.stream_consensus(db, req.query, req.paper_ids),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+class ExtractColumnRequest(BaseModel):
+    paper_ids: List[str]
+    column_name: str
+    query_prompt: Optional[str] = None
+
+@app.post("/api/papers/extract-column")
+async def extract_custom_column(req: ExtractColumnRequest, db: Session = Depends(get_db)):
+    """
+    Dynamic Custom Extraction Columns (Elicit.org parity):
+    Runs targeted micro-extraction on custom questions/attributes across selected papers.
+    """
+    results: Dict[str, Any] = {}
+    for pid in req.paper_ids:
+        paper = DatabaseService.get_paper_by_id(db, pid)
+        if not paper:
+            continue
+        extracted = await PaperExtractor.extract_custom_attribute(
+            paper_id=pid,
+            paper_title=paper.title or "Untitled Paper",
+            attribute_name=req.column_name,
+            query_prompt=req.query_prompt
+        )
+        results[pid] = extracted
+    return {"column_name": req.column_name, "extractions": results}
+
+@app.get("/api/citations/graph")
+def get_citation_graph(
+    paper_ids: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Interactive Citation Lineage & Co-Citation Graph (Connected Papers parity):
+    Returns 2D nodes and cross-citation / co-citation edges.
+    """
+    return CitationGraphService.build_graph(db, paper_ids)
+
+class LatexExportRequest(BaseModel):
+    paper_ids: List[str]
+    topic: Optional[str] = None
+    review_text: Optional[str] = None
+    format_style: Optional[str] = "ieee"
+
+@app.post("/api/export/latex")
+def export_latex_survey(req: LatexExportRequest, db: Session = Depends(get_db)):
+    """
+    One-Click Academic LaTeX / Overleaf Survey Export:
+    Returns complete IEEE/ACM formatted main.tex and references.bib source.
+    """
+    bundle = LaTeXExporter.generate_survey_bundle(
+        db=db,
+        paper_ids=req.paper_ids,
+        topic=req.topic,
+        review_text=req.review_text,
+        format_style=req.format_style or "ieee"
+    )
+    return {
+        "title": bundle["title"],
+        "main_tex": bundle["main_tex"],
+        "references_bib": bundle["references_bib"],
+        "paper_count": bundle["paper_count"]
+    }
+
+@app.post("/api/export/latex/zip")
+def download_latex_zip(req: LatexExportRequest, db: Session = Depends(get_db)):
+    """
+    Downloads compilable ZIP archive containing main.tex and references.bib.
+    """
+    bundle = LaTeXExporter.generate_survey_bundle(
+        db=db,
+        paper_ids=req.paper_ids,
+        topic=req.topic,
+        review_text=req.review_text,
+        format_style=req.format_style or "ieee"
+    )
+    from fastapi.responses import Response
+    return Response(
+        content=bundle["zip_bytes"],
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="survey_{uuid.uuid4().hex[:6]}.zip"'
+        }
+    )
+

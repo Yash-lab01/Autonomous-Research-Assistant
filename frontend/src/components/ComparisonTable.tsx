@@ -9,7 +9,9 @@ import {
   fetchPaperFigures,
   PaperFigure,
   fetchPaperTables,
-  ExtractedTable
+  ExtractedTable,
+  extractCustomColumn,
+  CustomColumnExtraction
 } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
@@ -114,7 +116,62 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortAsc, setSortAsc] = useState<boolean>(true);
 
+  // Dynamic Custom Columns State (Elicit.org parity)
+  const [customColumns, setCustomColumns] = useState<{
+    id: string;
+    name: string;
+    prompt?: string;
+    extractions: Record<string, { value: string; confidence?: number; page_number?: number; loading?: boolean }>;
+  }[]>([]);
+  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [newColName, setNewColName] = useState("");
+  const [newColPrompt, setNewColPrompt] = useState("");
+  const [extractingCol, setExtractingCol] = useState(false);
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const handleAddCustomColumn = async (colName: string, promptText?: string) => {
+    const name = colName.trim();
+    if (!name || selectedPapers.length === 0) return;
+
+    const colId = `custom_${Date.now()}`;
+    const initialExtractions: Record<string, any> = {};
+    selectedPapers.forEach((p) => {
+      initialExtractions[p.id] = { value: "Extracting...", loading: true };
+    });
+
+    const newCol = {
+      id: colId,
+      name: name,
+      prompt: promptText,
+      extractions: initialExtractions
+    };
+
+    setCustomColumns((prev) => [...prev, newCol]);
+    setShowAddColumnModal(false);
+    setNewColName("");
+    setNewColPrompt("");
+    setExtractingCol(true);
+
+    try {
+      const res = await extractCustomColumn(
+        selectedPapers.map((p) => p.id),
+        name,
+        promptText
+      );
+      setCustomColumns((prev) =>
+        prev.map((c) => (c.id === colId ? { ...c, extractions: res.extractions } : c))
+      );
+    } catch (err) {
+      console.error("Custom column extraction error:", err);
+    } finally {
+      setExtractingCol(false);
+    }
+  };
+
+  const handleRemoveCustomColumn = (colId: string) => {
+    setCustomColumns((prev) => prev.filter((c) => c.id !== colId));
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
@@ -411,13 +468,22 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                 </div>
 
                 {viewMode === "table" && (
-                  <a
-                    href={getExportComparisonCSVUrl(selectedPapers.map(p => p.id))}
-                    download="research_comparison_matrix.csv"
-                    className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 text-xs font-medium transition-all flex items-center gap-1.5"
-                  >
-                    📥 Export CSV
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowAddColumnModal(true)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                      title="Add a custom question or attribute to compare across all papers (Elicit.org Parity)"
+                    >
+                      <span>✨</span> + Add Custom Column
+                    </button>
+                    <a
+                      href={getExportComparisonCSVUrl(selectedPapers.map(p => p.id))}
+                      download="research_comparison_matrix.csv"
+                      className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 text-xs font-medium transition-all flex items-center gap-1.5"
+                    >
+                      📥 Export CSV
+                    </a>
+                  </div>
                 )}
               </div>
             </div>
@@ -450,6 +516,59 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                             <CellValue attrKey={row.key} paper={p} />
                           </td>
                         ))}
+                      </tr>
+                    ))}
+
+                    {/* Dynamic Custom Columns (Elicit.org Parity) */}
+                    {customColumns.map((col) => (
+                      <tr key={col.id} className="border-b border-emerald-950/50 bg-emerald-950/10 hover:bg-emerald-950/20 transition-colors">
+                        <td className="p-4 font-semibold text-emerald-300 bg-slate-950/90 border-r border-slate-800/80 sticky left-0 align-top z-10">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="flex items-center gap-1 truncate" title={col.prompt || col.name}>
+                              <span className="text-[10px]">✨</span>
+                              <span className="truncate">{col.name}</span>
+                            </span>
+                            <button
+                              onClick={() => handleRemoveCustomColumn(col.id)}
+                              className="text-slate-500 hover:text-rose-400 p-0.5 rounded text-[10px] cursor-pointer"
+                              title="Remove custom column"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <span className="text-[9px] text-slate-500 font-mono block mt-0.5">AI Micro-Extraction</span>
+                        </td>
+                        {selectedPapers.map((p) => {
+                          const ext = col.extractions[p.id];
+                          return (
+                            <td key={p.id} className="p-4 align-top border-l border-slate-800/80">
+                              {!ext || ext.loading ? (
+                                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono animate-pulse">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                  <span>Extracting...</span>
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold text-slate-200 leading-relaxed">
+                                    {ext.value}
+                                  </p>
+                                  <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono">
+                                    {ext.confidence !== undefined && (
+                                      <span className="text-emerald-400">
+                                        {Math.round(ext.confidence * 100)}% conf
+                                      </span>
+                                    )}
+                                    {ext.page_number && (
+                                      <span className="text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
+                                        p.{ext.page_number}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
@@ -773,6 +892,103 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
           </div>
         </div>
       )}
+
+      {/* Add Custom Column Modal (Elicit.org Parity) */}
+      {showAddColumnModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="glass-panel max-w-lg w-full rounded-2xl p-6 space-y-4 border border-emerald-500/40 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">✨</span>
+                <h4 className="font-bold text-slate-100">Add Custom Extraction Column</h4>
+              </div>
+              <button
+                onClick={() => setShowAddColumnModal(false)}
+                className="text-slate-400 hover:text-white text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Define any custom question or attribute (e.g. <em>Hardware</em>, <em>Learning Rate</em>, <em>Loss Function</em>).
+              The AI agent will perform targeted vector retrieval across each paper to extract the exact answer.
+            </p>
+
+            {/* Quick Suggestion Chips */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                Quick Suggestions:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { name: "Hardware & GPUs", prompt: "Extract GPU model, count, cluster setup, and VRAM" },
+                  { name: "Learning Rate & Optimizer", prompt: "Extract optimizer name, peak learning rate, and schedule" },
+                  { name: "Dataset Sample Size", prompt: "Extract training dataset token count or number of samples" },
+                  { name: "Context Window Size", prompt: "Extract maximum input context length / token window" },
+                  { name: "Evaluation Metric & Baseline", prompt: "Extract primary evaluation metric and compared baseline model" }
+                ].map((sug, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setNewColName(sug.name);
+                      setNewColPrompt(sug.prompt);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-[11px] text-emerald-300 transition-all cursor-pointer"
+                  >
+                    + {sug.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Column Name / Attribute
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Training Compute (FLOPs)"
+                  value={newColName}
+                  onChange={(e) => setNewColName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Clarifying Prompt <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Extract total floating point operations or GPU hours"
+                  value={newColPrompt}
+                  onChange={(e) => setNewColPrompt(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setShowAddColumnModal(false)}
+                className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAddCustomColumn(newColName, newColPrompt)}
+                disabled={!newColName.trim() || extractingCol}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-950/40 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {extractingCol ? "Extracting..." : "Extract & Add Column ✨"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
