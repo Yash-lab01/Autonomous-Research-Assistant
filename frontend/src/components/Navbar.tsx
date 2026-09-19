@@ -2,79 +2,39 @@
 
 import React, { useState, useEffect } from "react";
 
-export interface NavSection {
+export interface NavPillar {
   id: string;
   icon: string;
   label: string;
   shortLabel: string;
-  hint: string;
+  desc: string;
   step: number;
 }
 
-export const NAV_SECTIONS: NavSection[] = [
+export const NAV_PILLARS: NavPillar[] = [
   {
-    id: "discovery",
-    icon: "🔍",
-    label: "Paper Discovery",
-    shortLabel: "Discovery",
-    hint: "Search arXiv & ingest papers into vector memory",
+    id: "papers",
+    icon: "📚",
+    label: "Paper Hub",
+    shortLabel: "Paper Hub",
+    desc: "arXiv preprint discovery & knowledge base management",
     step: 1,
   },
   {
-    id: "library",
-    icon: "📚",
-    label: "Knowledge Library",
-    shortLabel: "Library",
-    hint: "Explore indexed papers, figures & extracted schemas",
+    id: "studio",
+    icon: "🔬",
+    label: "Synthesis Studio",
+    shortLabel: "Studio",
+    desc: "Taxonomy matrix, deep summaries, literature surveys & research gaps",
     step: 2,
   },
   {
-    id: "chat",
+    id: "copilot",
     icon: "💬",
-    label: "Agentic Chat",
-    shortLabel: "Chat",
-    hint: "Multimodal RAG with live reasoning steps & citations",
+    label: "Agent Copilot",
+    shortLabel: "Copilot",
+    desc: "Multimodal RAG chat assistant & field evolution timeline",
     step: 3,
-  },
-  {
-    id: "compare",
-    icon: "📊",
-    label: "Compare Papers",
-    shortLabel: "Compare",
-    hint: "Side-by-side taxonomy matrix & point-based contrast",
-    step: 4,
-  },
-  {
-    id: "summary",
-    icon: "📑",
-    label: "Paper Summary",
-    shortLabel: "Summary",
-    hint: "Per-paper deep dives & cross-paper synthesis",
-    step: 5,
-  },
-  {
-    id: "review",
-    icon: "📝",
-    label: "Literature Review",
-    shortLabel: "Review",
-    hint: "Autonomous academic survey drafting & citation export",
-    step: 6,
-  },
-  {
-    id: "gaps",
-    icon: "⚡",
-    label: "Research Gaps",
-    shortLabel: "Gaps",
-    hint: "Cross-paper limitation analysis & novel hypothesis discovery",
-    step: 7,
-  },
-  {
-    id: "timeline",
-    icon: "🗓️",
-    label: "Field Evolution",
-    shortLabel: "Timeline",
-    hint: "Chronological evolution of methods, models & benchmarks",
-    step: 8,
   },
 ];
 
@@ -108,64 +68,64 @@ export default function Navbar({ activeSection, onNavigate, ingestedCount }: Nav
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
-        {/* Logo & Brand Identity (Clean, architectural, no AI slop gradients) */}
+        {/* Logo & Brand Identity */}
         <button
           onClick={scrollToTop}
-          className="flex items-center gap-3 shrink-0 text-left group focus:outline-none"
+          className="flex items-center gap-2.5 shrink-0 text-left group focus:outline-none"
         >
-          <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center font-mono font-bold text-xs text-blue-400 group-hover:border-blue-500/60 group-hover:bg-slate-850 transition-all">
+          <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center font-mono font-bold text-xs text-blue-400 group-hover:border-blue-500/60 transition-all">
             OS
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span className="text-sm font-bold tracking-tight text-slate-100 group-hover:text-blue-300 transition-colors">
                 AI RESEARCH OS
               </span>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+              <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 py-0.2 rounded">
                 v2.0
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 font-mono">Autonomous Literature Intelligence</p>
+            <p className="text-[10px] text-slate-400 font-mono">Autonomous Literature Platform</p>
           </div>
         </button>
 
-        {/* Scrollable Navigation Bar with Section Anchors */}
-        <nav className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800/90 overflow-x-auto custom-scrollbar max-w-2xl">
-          {NAV_SECTIONS.map((sec) => {
-            const isActive = activeSection === sec.id;
+        {/* 3 Unified Pillar Navigation Buttons */}
+        <nav className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800/90">
+          {NAV_PILLARS.map((pillar) => {
+            const isActive = activeSection === pillar.id;
             return (
               <button
-                key={sec.id}
-                onClick={() => onNavigate(sec.id)}
-                title={sec.hint}
-                className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                key={pillar.id}
+                onClick={() => onNavigate(pillar.id)}
+                title={pillar.desc}
+                className={`relative px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
                   isActive
                     ? "bg-blue-600 text-white font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/70"
+                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-850"
                 }`}
               >
-                <span className="text-xs">{sec.icon}</span>
-                <span>{sec.shortLabel}</span>
+                <span className="text-sm leading-none">{pillar.icon}</span>
+                <span>{pillar.label}</span>
                 <span
                   className={`text-[9px] font-mono px-1 rounded ${
                     isActive ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
                   }`}
                 >
-                  {sec.step}
+                  0{pillar.step}
                 </span>
               </button>
             );
           })}
         </nav>
 
-        {/* Telemetry Status Right Side */}
-        <div className="hidden lg:flex items-center gap-2.5 text-xs shrink-0 font-mono">
+        {/* Right Status Indicators */}
+        <div className="hidden md:flex items-center gap-2 text-xs font-mono shrink-0">
           <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-1.5 text-[11px]">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>Groq Qwen 27B</span>
           </div>
           <button
-            onClick={() => onNavigate("library")}
+            onClick={() => onNavigate("papers")}
             className={`px-2.5 py-1 rounded-lg border text-[11px] transition-all flex items-center gap-1.5 ${
               ingestedCount > 0
                 ? "bg-blue-950/40 border-blue-500/30 text-blue-300 hover:border-blue-400"
@@ -173,7 +133,7 @@ export default function Navbar({ activeSection, onNavigate, ingestedCount }: Nav
             }`}
           >
             <span>📚</span>
-            <span>{ingestedCount} Ingested</span>
+            <span>{ingestedCount} Indexed</span>
           </button>
         </div>
       </div>
