@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ChatResponse, CitationItem, PaperItem, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import StreamedMarkdown from "@/components/StreamedMarkdown";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const CHAT_STORAGE_KEY = "ai_research_os_chat_history";
@@ -304,9 +305,13 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
                 </details>
               )}
 
-              {/* Message content — use MarkdownRenderer for assistant, plain text for user */}
+              {/* Message content — use StreamedMarkdown for the latest assistant message, MarkdownRenderer for history */}
               {m.role === "assistant" ? (
-                <MarkdownRenderer content={m.content} className="text-sm" />
+                idx === messages.length - 1 ? (
+                  <StreamedMarkdown content={m.content} className="text-sm" />
+                ) : (
+                  <MarkdownRenderer content={m.content} className="text-sm" />
+                )
               ) : (
                 <div className="whitespace-pre-wrap">{m.content}</div>
               )}

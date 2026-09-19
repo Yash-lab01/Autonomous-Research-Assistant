@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { PaperItem, fetchResearchGaps } from "@/lib/api";
+import StreamedMarkdown from "@/components/StreamedMarkdown";
 
 interface ResearchGapsProps {
   papers: PaperItem[];
@@ -248,7 +249,7 @@ export default function ResearchGaps({ papers }: ResearchGapsProps) {
           </div>
 
           <div className="px-8 py-6 max-w-4xl">
-            {renderMarkdownReport(reportMarkdown)}
+            <StreamedMarkdown content={reportMarkdown} isGenerating={analyzing} />
           </div>
         </div>
       )}

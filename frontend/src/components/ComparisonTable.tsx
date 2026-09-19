@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { PaperItem, getExportComparisonCSVUrl, fetchProseComparison, fetchPaperFigures, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import StreamedMarkdown from "@/components/StreamedMarkdown";
 
 interface ComparisonTableProps {
   papers: PaperItem[];
@@ -431,7 +432,7 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                     Generating structured point-based comparison...
                   </div>
                 ) : proseComparison ? (
-                  <MarkdownRenderer content={proseComparison} />
+                  <StreamedMarkdown content={proseComparison} isGenerating={loadingProse} />
                 ) : (
                   <div className="text-xs text-slate-500">Click 📝 Prose Analysis Mode to generate the structured comparison.</div>
                 )}

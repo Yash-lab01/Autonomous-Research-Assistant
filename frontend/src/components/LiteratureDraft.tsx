@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from "react";
 import { exportCitations, fetchPaperFigures, PaperItem, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import StreamedMarkdown from "@/components/StreamedMarkdown";
 
 interface LiteratureDraftProps {
   papers: PaperItem[];
@@ -456,7 +457,7 @@ export default function LiteratureDraft({ papers }: LiteratureDraftProps) {
 
           {/* Rendered Review Body — supports markdown tables, math/KaTeX, bold, headers */}
           <div className="px-8 py-6 max-w-4xl">
-            <MarkdownRenderer content={reviewContent} />
+            <StreamedMarkdown content={reviewContent} isGenerating={generating} />
           </div>
 
           {/* Supporting Figures & Diagrams Panel */}

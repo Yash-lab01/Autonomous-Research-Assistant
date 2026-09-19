@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { PaperItem, fetchSinglePaperSummary, fetchCombinedSummary, fetchPaperFigures, PaperFigure } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import StreamedMarkdown from "@/components/StreamedMarkdown";
 
 interface PaperSummaryProps {
   papers: PaperItem[];
@@ -340,7 +341,7 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
           </div>
 
           <div className="px-8 py-6 max-w-4xl">
-            <MarkdownRenderer content={summaryContent} />
+            <StreamedMarkdown content={summaryContent} isGenerating={generating} />
           </div>
 
           {/* Visual Evidence & Extracted Diagram Gallery */}

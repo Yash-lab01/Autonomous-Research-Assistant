@@ -1,0 +1,1408 @@
+Sure — here is the **complete content**, formatted so you can directly copy it into a document/PDF.
+
+# How to Tell If a Website Looks AI-Generated
+
+### Common Signals People Notice — and How to Make AI-Built Websites Feel Human-Designed
+
+---
+
+## Introduction
+
+AI website builders and coding assistants can now produce surprisingly polished websites in minutes. However, users and designers are increasingly able to recognize certain patterns that make a website **feel AI-generated, template-based, or “AI slop.”**
+
+None of these signs proves that AI was used. A human designer can use the same techniques, and an AI-generated website can be heavily customized.
+
+The important idea is:
+
+> **Don't look for one AI signal. Look for a combination of repeated patterns.**
+
+A website becomes noticeably “AI-looking” when its visual design, copy, structure, and functionality all feel **generic, predictable, or insufficiently customized**.
+
+---
+
+# 1. Generic Purple / Blue Gradients
+
+### What people notice
+
+One of the most recognizable patterns in AI-generated startup websites is:
+
+* Purple/indigo gradients
+* Blue → purple backgrounds
+* Glowing gradient blobs
+* Mesh gradients
+* Neon accents
+* Gradient text
+
+A common combination is:
+
+> Dark background + purple glow + white text + rounded cards + glowing CTA.
+
+### Why it looks AI-generated
+
+These styles are extremely common in modern SaaS landing pages and appear frequently in AI-generated design examples.
+
+The problem isn't the color itself.
+
+The problem is **using the same visual language regardless of the product or brand**.
+
+### How to avoid it
+
+Choose colors based on:
+
+* Brand identity
+* Industry
+* Product personality
+* Target audience
+* Actual content
+
+Use distinctive color combinations instead of automatically reaching for purple/blue gradients.
+
+**Better approach:**
+
+Instead of:
+
+> “Make it modern with a purple gradient.”
+
+Think:
+
+> “What visual language makes sense for this particular product?”
+
+---
+
+# 2. The Predictable AI Hero Section
+
+### What people notice
+
+A very common AI-generated hero looks like:
+
+```text
+              Small badge
+
+      BIG HEADLINE GOES HERE
+
+       Supporting description
+
+     [ Get Started ] [ Learn More ]
+
+             Product image
+```
+
+Often it is perfectly centered with:
+
+* Huge heading
+* Small eyebrow text
+* Two buttons
+* Decorative gradient
+* Floating elements
+
+### Why it looks AI-generated
+
+This structure is extremely common in AI-generated landing pages because it is a safe, proven template.
+
+AI tends to reproduce patterns that already work rather than inventing a layout specifically for the product.
+
+### How to avoid it
+
+Let the **content determine the layout**.
+
+For example:
+
+* A dashboard product might benefit from the dashboard being immediately visible.
+* A photography site might use a full-screen image.
+* A developer tool might put an interactive code example in the hero.
+* A restaurant might prioritize imagery and booking.
+* A portfolio might immediately show work.
+
+Don't automatically use:
+
+> Headline → subtitle → 2 buttons → screenshot.
+
+---
+
+# 3. The “Three Cards” Pattern
+
+### What people notice
+
+A very common section contains:
+
+```text
+┌────────────┐ ┌────────────┐ ┌────────────┐
+│     ⚡     │ │     🚀     │ │     🔒     │
+│   Feature  │ │   Feature  │ │   Feature  │
+│            │ │            │ │            │
+│  Text...   │ │  Text...   │ │  Text...   │
+└────────────┘ └────────────┘ └────────────┘
+```
+
+Three perfectly identical cards.
+
+### Why it looks AI-generated
+
+AI frequently divides information into three visually balanced components.
+
+The result can feel like:
+
+> “The AI needed another section, so it generated three cards.”
+
+### How to avoid it
+
+Don't force information into three columns.
+
+Instead:
+
+* Use one large feature.
+* Use a 2-column layout.
+* Use an asymmetric layout.
+* Combine text with imagery.
+* Use a timeline.
+* Use a comparison.
+* Use an interactive demo.
+
+**Design according to information hierarchy, not mathematical symmetry.**
+
+---
+
+# 4. Excessive Rounded Corners
+
+### What people notice
+
+Everything has a large border radius:
+
+* Cards
+* Buttons
+* Inputs
+* Images
+* Modals
+* Containers
+* Navigation elements
+
+For example:
+
+```text
+Card radius: 20px
+Button radius: 999px
+Input radius: 16px
+Image radius: 24px
+```
+
+### Why it looks AI-generated
+
+Rounded UI has become a common default in AI-generated interfaces.
+
+When **everything** is rounded, the design loses hierarchy and personality.
+
+### How to avoid it
+
+Use different shapes intentionally.
+
+For example:
+
+* Buttons: 6–10px
+* Cards: 10–14px
+* Images: 0–8px
+* Special elements: larger radius when appropriate
+
+Or deliberately use a sharp-edged design.
+
+The important thing is **consistency with the brand**, not following the current AI aesthetic.
+
+---
+
+# 5. Generic Typography
+
+### What people notice
+
+The website uses extremely common fonts such as:
+
+* Inter
+* Roboto
+* Open Sans
+* System UI
+* Geist
+* similar modern sans-serif fonts
+
+Again, these fonts are not bad.
+
+### Why it looks AI-generated
+
+AI-generated websites frequently choose a safe modern sans-serif because it works reasonably well everywhere.
+
+When combined with other generic patterns, it contributes to the “AI template” feeling.
+
+### How to avoid it
+
+Choose typography based on the personality of the product.
+
+Consider:
+
+* Serif + sans combinations
+* Display fonts
+* Editorial typography
+* Distinctive weights
+* Custom type scales
+
+But don't use unusual fonts just to appear unique.
+
+**Typography should communicate personality.**
+
+---
+
+# 6. Generic Marketing Copy
+
+### What people notice
+
+AI-generated websites frequently contain phrases such as:
+
+> “Unlock the future.”
+
+> “Transform your workflow.”
+
+> “Seamlessly streamline your business.”
+
+> “Empower your team.”
+
+> “Take your productivity to the next level.”
+
+> “Experience the power of innovation.”
+
+### Why it looks AI-generated
+
+The copy sounds professional but often communicates very little.
+
+It could describe almost any startup.
+
+### How to avoid it
+
+Replace vague claims with **specific information**.
+
+Instead of:
+
+> “Transform your workflow with our powerful AI platform.”
+
+Use:
+
+> “Turn 30-page contracts into searchable answers in under a minute.”
+
+Specific copy feels more human because it communicates an actual understanding of the product.
+
+---
+
+# 7. Overuse of AI-Sounding Words
+
+### Common examples
+
+Words that frequently appear in generic AI-written marketing include:
+
+* Seamless
+* Innovative
+* Cutting-edge
+* Transformative
+* Robust
+* Powerful
+* Next-generation
+* Revolutionary
+* Empower
+* Unlock
+* Elevate
+* Leverage
+* Ecosystem
+* Game-changing
+
+### Why it looks AI-generated
+
+Individual words aren't suspicious.
+
+The problem occurs when **every section uses the same style of language**.
+
+### How to avoid it
+
+Write like a person who actually uses the product.
+
+Use:
+
+* Specific numbers
+* Real examples
+* Real customer problems
+* Concrete outcomes
+* Product terminology
+* Opinions
+* Limitations
+
+Instead of:
+
+> “A powerful platform for modern teams.”
+
+Try:
+
+> “Your team can review, comment on, and approve a campaign without opening five different tools.”
+
+---
+
+# 8. The Website Could Belong to Anyone
+
+### The substitution test
+
+Imagine replacing the company name with another company.
+
+If the website still makes perfect sense, it is probably too generic.
+
+For example:
+
+> “Helping businesses unlock their potential through intelligent solutions.”
+
+Could describe:
+
+* An AI startup
+* A consulting company
+* A marketing agency
+* A SaaS company
+* A fintech company
+
+### Why it matters
+
+Good design reflects the **specific identity of the product**.
+
+AI-generated sites often optimize for:
+
+> “What does a modern startup website usually look like?”
+
+rather than:
+
+> “What should this specific company look like?”
+
+### How to avoid it
+
+Include things that are difficult to generate generically:
+
+* Product-specific terminology
+* Real screenshots
+* Real customer stories
+* Unique illustrations
+* Brand-specific visual elements
+* Industry-specific references
+* Actual product workflows
+
+---
+
+# 9. Excessive Decorative Gradients and Glows
+
+### What people notice
+
+AI-generated websites often add:
+
+* Glow effects
+* Gradient blobs
+* Floating circles
+* Abstract 3D objects
+* Glassmorphism
+* Background noise
+* Floating cards
+* Animated particles
+
+### Why it looks AI-generated
+
+These elements make a website look “designed” very quickly.
+
+But they often don't serve a functional purpose.
+
+### How to avoid it
+
+Ask:
+
+> **“What does this element accomplish?”**
+
+If removing it doesn't hurt:
+
+* usability
+* hierarchy
+* branding
+* communication
+
+then consider removing it.
+
+A simpler website can feel significantly more intentional.
+
+---
+
+# 10. Perfect Symmetry Everywhere
+
+### What people notice
+
+AI often creates:
+
+* Equal-width cards
+* Equal spacing
+* Centered text
+* Symmetrical layouts
+* Identical component heights
+* Perfectly aligned elements
+
+### Why it looks AI-generated
+
+Real designs often contain intentional asymmetry.
+
+AI tends to prefer layouts that are mathematically safe and visually balanced.
+
+### How to avoid it
+
+Use intentional asymmetry:
+
+```text
+┌──────────────────────┐
+│ Large feature        │
+│                      │
+│              Image   │
+│              Image   │
+└──────────────────────┘
+```
+
+instead of:
+
+```text
+┌──────┐ ┌──────┐ ┌──────┐
+│      │ │      │ │      │
+│      │ │      │ │      │
+└──────┘ └──────┘ └──────┘
+```
+
+But asymmetry should have a reason.
+
+---
+
+# 11. Stock-Looking or Generic Images
+
+### What people notice
+
+AI-generated websites may use:
+
+* Generic business people
+* Generic office photos
+* Generic 3D illustrations
+* AI-generated portraits
+* Abstract blobs
+* Generic laptop mockups
+
+### Why it looks AI-generated
+
+The imagery doesn't necessarily connect to the company's actual identity.
+
+### How to avoid it
+
+Use:
+
+* Actual product screenshots
+* Real photographs
+* Original illustrations
+* Brand-specific graphics
+* Real employees when appropriate
+* Real environments
+* Product-specific diagrams
+
+**Authentic imagery is one of the fastest ways to make a website feel real.**
+
+---
+
+# 12. Fake-Looking Testimonials
+
+### What people notice
+
+For example:
+
+> “This platform completely transformed our workflow! It's absolutely incredible!”
+
+— John Smith, CEO
+
+### Why it looks AI-generated
+
+The testimonial:
+
+* Sounds too perfect
+* Contains no specific result
+* Has generic praise
+* May use a suspiciously generic name/photo
+
+### How to avoid it
+
+Use real testimonials with specifics.
+
+Better:
+
+> “We reduced our weekly reporting process from roughly four hours to 45 minutes.”
+
+Specificity creates credibility.
+
+---
+
+# 13. Fake or Meaningless Statistics
+
+### What people notice
+
+AI-generated landing pages sometimes include:
+
+```text
+99.9%
+Customer Satisfaction
+
+10x
+More Productivity
+
+50K+
+Happy Users
+```
+
+without explaining where the numbers came from.
+
+### Why it looks AI-generated
+
+The numbers look like placeholders designed to make the company appear established.
+
+### How to avoid it
+
+Only use metrics you can substantiate.
+
+Instead of:
+
+> “10× productivity”
+
+say:
+
+> “Average report preparation time fell from 3.2 hours to 38 minutes in our internal test.”
+
+Real context is more convincing.
+
+---
+
+# 14. Everything Looks Like a Template
+
+### What people notice
+
+The entire site follows a familiar sequence:
+
+```text
+Navbar
+↓
+Hero
+↓
+Features
+↓
+Product screenshot
+↓
+Testimonials
+↓
+Pricing
+↓
+FAQ
+↓
+CTA
+↓
+Footer
+```
+
+### Why it looks AI-generated
+
+This is effectively the “default startup landing page.”
+
+### How to avoid it
+
+Ask:
+
+> “Does every section need to exist?”
+
+Remove sections that don't contribute.
+
+A five-section website with strong content is often better than a twelve-section website filled with generic material.
+
+---
+
+# 15. Repetitive Content
+
+### What people notice
+
+The website keeps saying the same thing:
+
+> Save time.
+
+> Work faster.
+
+> Increase productivity.
+
+> Improve efficiency.
+
+> Get more done.
+
+### Why it looks AI-generated
+
+AI can generate large amounts of content without introducing genuinely new information.
+
+### How to avoid it
+
+Give every section a unique job.
+
+For example:
+
+```text
+Hero → What is it?
+
+Demo → How does it work?
+
+Features → What can it do?
+
+Case study → Does it actually work?
+
+Pricing → How much does it cost?
+
+FAQ → What objections do users have?
+```
+
+If two sections answer the same question, remove one.
+
+---
+
+# 16. Generic Icons Everywhere
+
+### What people notice
+
+Every feature gets an icon:
+
+⚡ Speed
+🔒 Security
+🚀 Growth
+💡 Innovation
+🎯 Productivity
+
+### Why it looks AI-generated
+
+AI frequently uses icons as an easy way to visually decorate otherwise empty cards.
+
+### How to avoid it
+
+Only use an icon when it improves comprehension.
+
+Sometimes:
+
+**Text + screenshot**
+
+is much better than:
+
+**Icon + text + paragraph.**
+
+---
+
+# 17. Animations That Exist Just to Look Impressive
+
+### What people notice
+
+* Everything fades in
+* Everything slides upward
+* Cards float
+* Text animates word-by-word
+* Background continuously moves
+* Buttons have elaborate hover effects
+
+### Why it looks AI-generated
+
+Animations are easy for AI to add but often aren't based on actual interaction design.
+
+### How to avoid it
+
+Use animation to communicate:
+
+* hierarchy
+* state changes
+* navigation
+* cause and effect
+* interaction feedback
+
+Avoid animation simply because:
+
+> “It looks cool.”
+
+---
+
+# 18. Broken or Fake Functionality
+
+### What people notice
+
+The site looks beautiful, but:
+
+* Buttons don't work
+* Forms don't submit
+* Search doesn't work
+* Tabs don't work
+* Login isn't implemented
+* Download buttons are fake
+* Dashboard controls are decorative
+
+### Why this is a strong signal
+
+AI can generate the **appearance of functionality** much faster than the actual underlying functionality.
+
+### How to avoid it
+
+Test every interactive element.
+
+For every button ask:
+
+> “What actually happens when the user clicks this?”
+
+If nothing happens, either implement it or remove it.
+
+---
+
+# 19. Missing Real-World States
+
+A polished AI-generated interface often shows only the perfect scenario.
+
+Real products need:
+
+* Loading state
+* Empty state
+* Error state
+* Success state
+* No-results state
+* Permission state
+* Offline state
+* Validation errors
+* Long text
+* Large datasets
+
+### Why it matters
+
+Real designers and developers have to account for the messy situations real users encounter.
+
+### How to avoid it
+
+For every major feature, design at least:
+
+```text
+Initial
+↓
+Loading
+↓
+Success
+↓
+Empty
+↓
+Error
+↓
+Retry
+```
+
+---
+
+# 20. Mobile Responsiveness Problems
+
+### What people notice
+
+AI can generate a beautiful desktop design but the mobile version may have:
+
+* Awkward spacing
+* Oversized text
+* Overflowing cards
+* Broken navigation
+* Horizontal scrolling
+* Buttons wrapping badly
+
+### How to avoid it
+
+Don't treat mobile as an afterthought.
+
+Test at:
+
+* Desktop
+* Tablet
+* Mobile
+* Very narrow mobile
+
+And test with realistic content, not just placeholder text.
+
+---
+
+# 21. Inconsistent UX
+
+### What people notice
+
+For example:
+
+* One button says “Get Started”
+* Another says “Start Now”
+* Another says “Try It”
+* Another says “Launch”
+
+when all perform the same action.
+
+Or:
+
+* Different card styles
+* Different spacing
+* Different button shapes
+* Different terminology
+
+### Why it looks AI-generated
+
+AI may generate individual sections independently without maintaining a strong global design system.
+
+### How to avoid it
+
+Create a small design system:
+
+```text
+Colors
+Typography
+Spacing
+Buttons
+Cards
+Inputs
+Icons
+Borders
+Radius
+Shadows
+```
+
+Then reuse those decisions consistently.
+
+---
+
+# 22. Excessive Use of “Modern SaaS” Design Language
+
+### Typical combination
+
+The strongest AI-looking signal isn't necessarily one individual choice.
+
+It is the combination:
+
+> Inter + purple gradient + huge centered hero + rounded cards + pill buttons + glassmorphism + three feature cards + generic copy.
+
+Each element is normal.
+
+**Together they become predictable.**
+
+### How to avoid it
+
+Break at least some of the defaults.
+
+For example:
+
+* Different typography
+* Distinctive layout
+* Brand-specific imagery
+* Real product screenshots
+* More specific copy
+* Less decoration
+* Unusual but purposeful composition
+
+---
+
+# 23. Builder / Source-Code Fingerprints
+
+For technically minded users, the source code can provide additional clues.
+
+Look for:
+
+* Builder-specific metadata
+* Generator comments
+* Template names
+* Default assets
+* Builder-specific scripts
+* Unused dependencies
+* Repeated component structures
+* Default configuration
+* Recognizable generated code patterns
+
+### Important
+
+This is **evidence of tooling, not proof of AI**.
+
+A developer can manually use:
+
+* Next.js
+* React
+* Tailwind
+* shadcn/ui
+* Vite
+* Framer
+* Webflow
+
+without using AI.
+
+---
+
+# 24. AI-Generated Code That Feels Over-Engineered
+
+Sometimes AI-generated websites contain code that is unnecessarily complicated.
+
+Examples:
+
+* Components split into dozens of files
+* Excessive abstraction
+* Unused props
+* Duplicate components
+* Unused CSS
+* Huge dependency lists
+* Repeated logic
+* Comments explaining extremely obvious code
+
+### How to avoid it
+
+After AI generates the code:
+
+1. Run it.
+2. Understand it.
+3. Remove unnecessary abstractions.
+4. Consolidate duplicate components.
+5. Delete unused dependencies.
+6. Refactor repeated code.
+7. Test edge cases.
+
+AI should be treated as a **developer assistant**, not the final code reviewer.
+
+---
+
+# 25. The Biggest Overall Signal: Lack of Specificity
+
+If you remember only one thing, remember this:
+
+> **AI-generated websites often feel generic because they contain generic decisions.**
+
+A human-designed website tends to contain evidence of decisions made for a particular:
+
+* company
+* product
+* audience
+* industry
+* brand
+* problem
+
+The more specific the website feels, the less “AI-generated” it tends to feel.
+
+---
+
+# Part 2 — How to Make an AI-Built Website NOT Look AI-Generated
+
+The goal shouldn't be to **hide AI usage**.
+
+The goal should be:
+
+> **Use AI for speed while adding enough human/product-specific decisions that the final result feels intentional.**
+
+---
+
+## 1. Start With the Product, Not the Template
+
+Don't prompt:
+
+> “Create a modern SaaS landing page.”
+
+Instead provide:
+
+* Who uses the product?
+* What problem does it solve?
+* What makes it different?
+* What action should users take?
+* What should users understand within 5 seconds?
+
+AI should receive **product context before design instructions**.
+
+---
+
+# 2. Establish a Visual Identity Before Generating UI
+
+Define:
+
+### Typography
+
+* Primary font
+* Secondary font
+* Heading style
+* Body style
+
+### Colors
+
+* Primary
+* Secondary
+* Background
+* Accent
+* Text
+
+### Components
+
+* Button radius
+* Card radius
+* Border style
+* Shadow style
+* Icon style
+
+### Visual language
+
+For example:
+
+> “Editorial, warm, slightly imperfect, photographic, minimal.”
+
+instead of:
+
+> “Modern, clean, premium SaaS.”
+
+The second description is so common that AI will likely produce a familiar result.
+
+---
+
+# 3. Give AI Real Content
+
+This is one of the most effective improvements.
+
+Instead of:
+
+> “Generate testimonials.”
+
+Give it:
+
+> Customer: ABC Technologies
+> Problem: Weekly reports took 4 hours.
+> Result: Reduced to 40 minutes.
+> Quote: “…”
+
+Instead of:
+
+> “Generate statistics.”
+
+Give it:
+
+> 4,281 active users
+> 37% faster processing
+> 1,240 projects completed
+
+Real content forces the design to become more specific.
+
+---
+
+# 4. Use Real Product Screenshots
+
+A real screenshot immediately makes a website feel more authentic.
+
+Instead of:
+
+> Generic abstract dashboard
+
+use:
+
+> Actual product interface.
+
+This is especially important for:
+
+* SaaS
+* AI products
+* Developer tools
+* Productivity software
+* Analytics platforms
+
+---
+
+# 5. Break the Default Layout
+
+Don't let AI automatically generate:
+
+```text
+Hero
+↓
+3 cards
+↓
+3 cards
+↓
+Screenshot
+↓
+Testimonials
+↓
+Pricing
+```
+
+Ask:
+
+> “What is the most important information on this page?”
+
+Then design around that.
+
+---
+
+# 6. Remove 20–30% of the Generated UI
+
+This is an excellent practical rule.
+
+After AI generates a page, ask:
+
+> “What can be removed without reducing understanding?”
+
+Delete:
+
+* unnecessary cards
+* decorative graphics
+* repetitive sections
+* unnecessary icons
+* redundant headings
+* meaningless statistics
+
+**AI often adds more than necessary.**
+
+Human editing often means subtraction.
+
+---
+
+# 7. Rewrite the Copy Yourself
+
+You don't need to rewrite everything.
+
+Focus on:
+
+* Hero headline
+* Subheadline
+* CTA
+* Feature descriptions
+* Testimonials
+* About section
+
+Make them specific and conversational.
+
+A useful test:
+
+> **Could this sentence appear on 500 other websites?**
+
+If yes, rewrite it.
+
+---
+
+# 8. Add Real Imperfections
+
+Human-created products aren't necessarily mathematically perfect.
+
+You can introduce intentional character through:
+
+* asymmetric layouts
+* unusual image crops
+* distinctive typography
+* unique spacing
+* hand-drawn illustrations
+* custom icons
+* editorial composition
+
+But don't add random imperfections.
+
+The goal is **character**, not chaos.
+
+---
+
+# 9. Design the Boring Parts
+
+This is one of the biggest differences between a prototype and a real product.
+
+Don't only design:
+
+> Hero → landing page.
+
+Also design:
+
+* Loading
+* Empty
+* Error
+* Success
+* Login
+* Signup
+* Settings
+* Account states
+* Mobile navigation
+* Form validation
+* Search
+* Pagination
+* Notifications
+
+These details make a product feel **real**.
+
+---
+
+# 10. Test Everything
+
+Before publishing:
+
+### Click test
+
+Click every button.
+
+### Content test
+
+Replace placeholder text with realistic long text.
+
+### Mobile test
+
+Check different screen sizes.
+
+### Error test
+
+Break things intentionally.
+
+### Accessibility test
+
+Check:
+
+* keyboard navigation
+* contrast
+* labels
+* focus states
+* screen-reader semantics
+
+### Performance test
+
+Check:
+
+* loading speed
+* image sizes
+* JavaScript
+* unnecessary dependencies
+
+AI-generated doesn't have to mean poorly engineered.
+
+---
+
+# 11. Give AI Better Prompts
+
+Instead of:
+
+> “Make a beautiful modern website.”
+
+Use something closer to:
+
+> “Design a website for [specific audience] who use the product to [specific task]. Avoid generic SaaS landing-page patterns such as purple gradients, excessive rounded cards, three-column feature grids, glassmorphism, and generic marketing copy. Prioritize the actual product workflow and use the supplied brand guidelines, screenshots, and real customer data.”
+
+The more constraints and context you provide, the less likely AI is to fall back to its defaults.
+
+---
+
+# 12. Make AI Critique Its Own Output
+
+After generating the site, ask:
+
+> **“Analyze this website as a skeptical senior product designer. Identify anything that makes it look template-based, generic, AI-generated, or unnecessarily decorative. Then propose specific replacements.”**
+
+Then iterate.
+
+A useful workflow is:
+
+```text
+Generate
+   ↓
+Critique
+   ↓
+Identify generic patterns
+   ↓
+Remove / redesign
+   ↓
+Test
+   ↓
+Critique again
+   ↓
+Ship
+```
+
+---
+
+# 13. Use Human Review
+
+AI can generate the first 80%.
+
+A human should provide the last 20%.
+
+That final 20% often includes:
+
+* Taste
+* Prioritization
+* Product understanding
+* Brand decisions
+* Copy editing
+* Edge cases
+* UX judgment
+* Real-world testing
+
+That's where a generic AI prototype becomes a **real product**.
+
+---
+
+# Final Checklist
+
+Before shipping an AI-built website, ask:
+
+### Visual
+
+* [ ] Does it rely on generic purple/blue gradients?
+* [ ] Are there too many rounded cards?
+* [ ] Is everything perfectly symmetrical?
+* [ ] Does it look like a common SaaS template?
+* [ ] Are decorative effects actually useful?
+* [ ] Does the typography have personality?
+* [ ] Are the images specific to the brand?
+
+### Copy
+
+* [ ] Is the headline specific?
+* [ ] Are there generic marketing phrases?
+* [ ] Are claims backed by evidence?
+* [ ] Does the copy sound like a real person?
+* [ ] Could another company use the same copy?
+
+### UX
+
+* [ ] Do all buttons actually work?
+* [ ] Are loading states implemented?
+* [ ] Are error states implemented?
+* [ ] Are empty states implemented?
+* [ ] Does mobile work properly?
+* [ ] Are interactions consistent?
+
+### Product
+
+* [ ] Does the design reflect the actual product?
+* [ ] Are real screenshots used?
+* [ ] Is real customer information used?
+* [ ] Does every section have a purpose?
+* [ ] Has unnecessary UI been removed?
+
+### Technical
+
+* [ ] Is generated code reviewed?
+* [ ] Are unused dependencies removed?
+* [ ] Are components reasonably structured?
+* [ ] Is the site performant?
+* [ ] Is accessibility considered?
+* [ ] Has the site been tested with real content?
+
+---
+
+# The Golden Rule
+
+The easiest way to make an AI-built website feel human-designed is **not to try to hide the fact that AI was used**.
+
+Instead:
+
+> **Give AI the boring, repetitive work. Give humans the decisions.**
+
+Use AI for:
+
+* scaffolding
+* components
+* boilerplate
+* variations
+* implementation
+* refactoring
+* rapid iteration
+
+Use human judgment for:
+
+* product strategy
+* visual identity
+* information hierarchy
+* copy
+* content
+* interaction design
+* brand personality
+* edge cases
+* final polish
+
+### In one sentence:
+
+> **AI-generated websites look AI-generated when they contain generic decisions; they look human-designed when every important decision has a specific reason behind it.**
