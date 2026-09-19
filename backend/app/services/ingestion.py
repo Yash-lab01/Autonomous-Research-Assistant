@@ -57,27 +57,48 @@ class IngestionPipeline:
                 paragraph_count=len(paragraphs)
             )
 
-            # Step 3: Structured Information Extraction via LLM (Bulk workload -> Ollama)
-            extracted_data: StructuredPaperExtraction = await PaperExtractor.extract_structured_data(
-                title=paper.title,
-                abstract=paper.summary or "",
-                paragraphs=paragraphs,
-                arxiv_id=arxiv_id
+            # Step 3: Concurrent Ingestion Tasks (Parallel Embeddings + Structured Extraction + Figure Extraction)
+            async def _embed_task():
+                # Runs in worker thread to prevent blocking async event loop during ONNX vector generation
+                await asyncio.to_thread(vector_store.upsert_paragraphs, paragraphs)
+
+            async def _extract_task():
+                return await PaperExtractor.extract_structured_data(
+                    title=paper.title,
+                    abstract=paper.summary or "",
+                    paragraphs=paragraphs,
+                    arxiv_id=arxiv_id
+                )
+
+            async def _figures_task():
+                try:
+                    return await asyncio.to_thread(HybridPDFParser.extract_figures, local_pdf_path, paper_id)
+                except Exception as fig_err:
+                    logger.warning(f"Concurrent figure extraction failed for {paper_id}: {fig_err}")
+                    return []
+
+            # Execute embedding, structured extraction, and figure extraction concurrently
+            _, extracted_data, figures = await asyncio.gather(
+                _embed_task(),
+                _extract_task(),
+                _figures_task()
             )
 
+            # Save figures if any were extracted
+            if figures:
+                try:
+                    DatabaseService.save_figures(db, paper_id, figures)
+                except Exception as save_fig_err:
+                    logger.debug(f"Could not save figures to db for {paper_id}: {save_fig_err}")
+
+            # Step 4: Mark Done with structured research card
             DatabaseService.update_paper_status(
                 db,
                 paper_id,
-                PaperStatus.EMBEDDING,
+                PaperStatus.DONE,
                 structured_data=extracted_data
             )
-
-            # Step 4: Vector Store Embedding (Qdrant)
-            vector_store.upsert_paragraphs(paragraphs)
-
-            # Step 5: Mark Done
-            DatabaseService.update_paper_status(db, paper_id, PaperStatus.DONE)
-            logger.info(f"Successfully finished ingestion pipeline for paper {paper_id} ({paper.title}).")
+            logger.info(f"Successfully finished concurrent ingestion pipeline for paper {paper_id} ({paper.title}).")
 
         except Exception as e:
             logger.error(f"Ingestion pipeline failed for paper {paper_id}: {e}", exc_info=True)

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperSearchResult, PaperItem, updatePaperNotes, fetchPaperFigures, fetchSimilarPapers, PaperFigure } from "@/lib/api";
+import { PaperSearchResult, PaperItem, updatePaperNotes, fetchPaperFigures, fetchSimilarPapers, PaperFigure, askFigureQuestion } from "@/lib/api";
 
 interface PaperCardProps {
   paper: PaperSearchResult | PaperItem;
@@ -26,6 +26,9 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
   const [loadingFigures, setLoadingFigures] = useState(false);
   const [activeLightboxFig, setActiveLightboxFig] = useState<PaperFigure | null>(null);
   const [figuresAiCaptioned, setFiguresAiCaptioned] = useState(false);
+  const [figQuestion, setFigQuestion] = useState("");
+  const [figAnswer, setFigAnswer] = useState<string | null>(null);
+  const [figLoading, setFigLoading] = useState(false);
 
   const [notesText, setNotesText] = useState(initialNotes);
   const [tagInput, setTagInput] = useState(initialTags.join(", "));
@@ -116,6 +119,24 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
       console.error("Similar papers error:", err);
     } finally {
       setLoadingSimilar(false);
+    }
+  };
+
+  const handleAskFigure = async (customQ?: string) => {
+    const query = customQ || figQuestion;
+    if (!query.trim() || !paperId || !activeLightboxFig?.figure_id) return;
+    setFigLoading(true);
+    try {
+      const res = await askFigureQuestion(
+        paperId,
+        activeLightboxFig.figure_id,
+        query.trim()
+      );
+      setFigAnswer(res.answer);
+    } catch (err: any) {
+      setFigAnswer(`⚠️ Failed to analyze diagram: ${err.message || err}`);
+    } finally {
+      setFigLoading(false);
     }
   };
 
@@ -323,29 +344,64 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
           {paper.published_date || "2026"}
         </span>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-3 border-t border-slate-800/80 flex-wrap">
           {paper.pdf_url && (
             <a
               href={paper.pdf_url}
               target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 font-medium text-xs transition-all border border-slate-700 flex items-center gap-1.5"
             >
-              📄 PDF
+              <span>📄</span> Read PDF
             </a>
           )}
 
-          {!isIngestedItem && onIngest && (
+          {isIngestedItem && (
             <button
-              onClick={() => onIngest(paper as PaperSearchResult)}
-              disabled={isIngesting || (paper as PaperSearchResult).already_ingested}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                (paper as PaperSearchResult).already_ingested
-                  ? "bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 cursor-default"
-                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20"
+              onClick={handleToggleFigures}
+              className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-all border flex items-center gap-1.5 ${
+                showFigures
+                  ? "bg-purple-600/30 border-purple-500/60 text-purple-200"
+                  : "bg-slate-800/60 border-slate-700 text-slate-400 hover:text-purple-300 hover:border-purple-500/40"
               }`}
             >
-              {(paper as PaperSearchResult).already_ingested ? "✓ Ingested" : isIngesting ? "Ingesting..." : "+ Add to OS"}
+              <span>🖼️</span> Figures
+              {figures.length > 0 && (
+                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.2 rounded-full">
+                  {figures.length}
+                </span>
+              )}
+            </button>
+          )}
+
+          {isIngestedItem && (
+            <button
+              onClick={() => setShowNotes(!showNotes)}
+              className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-all border flex items-center gap-1.5 ${
+                showNotes
+                  ? "bg-blue-600/30 border-blue-500/60 text-blue-200"
+                  : "bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span>📝</span> Notes
+              {tagsList.length > 0 && (
+                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded-full">
+                  {tagsList.length}
+                </span>
+              )}
+            </button>
+          )}
+
+          {isIngestedItem && (
+            <button
+              onClick={handleFindSimilar}
+              className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-all border flex items-center gap-1.5 ${
+                showSimilar
+                  ? "bg-indigo-600/30 border-indigo-500/60 text-indigo-200"
+                  : "bg-slate-800/60 border-slate-700 text-slate-400 hover:text-indigo-300 hover:border-indigo-500/40"
+              }`}
+            >
+              <span>🔍</span> Similar
             </button>
           )}
 
@@ -362,6 +418,20 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
               {confirmingRemove ? "⚠️ Confirm Remove" : "🗑 Remove"}
             </button>
           )}
+
+          {!isIngestedItem && onIngest && (
+            <button
+              onClick={() => onIngest(paper as PaperSearchResult)}
+              disabled={isIngesting || (paper as PaperSearchResult).already_ingested}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                (paper as PaperSearchResult).already_ingested
+                  ? "bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 cursor-default"
+                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20"
+              }`}
+            >
+              {(paper as PaperSearchResult).already_ingested ? "✓ Ingested" : isIngesting ? "Ingesting..." : "+ Add to OS"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -372,7 +442,7 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
           onClick={() => setActiveLightboxFig(null)}
         >
           <div
-            className="max-w-4xl w-full glass-panel rounded-2xl p-6 border border-purple-500/40 space-y-4 relative"
+            className="max-w-4xl w-full glass-panel rounded-2xl p-6 border border-purple-500/40 space-y-4 relative max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -390,17 +460,17 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
               </div>
               <button
                 onClick={() => setActiveLightboxFig(null)}
-                className="text-slate-400 hover:text-white text-lg shrink-0"
+                className="text-slate-400 hover:text-white text-lg shrink-0 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex justify-center bg-slate-950 p-4 rounded-xl max-h-[60vh] overflow-auto">
+            <div className="flex justify-center bg-slate-950 p-4 rounded-xl max-h-[45vh] overflow-auto">
               <img
                 src={`${API_BASE}${activeLightboxFig.url}`}
                 alt={activeLightboxFig.caption}
-                className="object-contain max-h-[55vh]"
+                className="object-contain max-h-[40vh]"
               />
             </div>
 
@@ -415,6 +485,83 @@ export default function PaperCard({ paper, onIngest, onRemove, isIngesting }: Pa
                 📥 Download Figure
               </a>
             </div>
+
+            {/* Interactive Multimodal Figure Inspector Q&A Drawer */}
+            {paperId && (
+              <div className="bg-slate-900/90 p-4 rounded-xl border border-purple-500/30 text-xs text-slate-300 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-purple-300 flex items-center gap-1.5">
+                    <span>💬</span> Ask Questions About This Diagram / Chart
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    ID: {activeLightboxFig.figure_id}
+                  </span>
+                </div>
+
+                {/* Quick question prompt chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "Explain what this diagram illustrates",
+                    "What are the key axes, trends, or components?",
+                    "Summarize the architecture workflow depicted"
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => handleAskFigure(chip)}
+                      disabled={figLoading}
+                      className="px-2.5 py-1 rounded-md bg-purple-950/40 text-purple-300 border border-purple-800/40 hover:bg-purple-900/50 hover:border-purple-600/60 text-[11px] transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      ✨ {chip}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Question input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. What does the orange curve demonstrate?"
+                    value={figQuestion}
+                    onChange={(e) => setFigQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAskFigure();
+                      }
+                    }}
+                    disabled={figLoading}
+                    className="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={() => handleAskFigure()}
+                    disabled={figLoading || !figQuestion.trim()}
+                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-lg text-xs transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    {figLoading ? (
+                      <>
+                        <span className="animate-spin text-xs">🌀</span>
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Ask Vision AI</span>
+                        <span>⚡</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Answer display */}
+                {figAnswer && (
+                  <div className="p-3 bg-purple-950/40 border border-purple-500/40 rounded-lg text-slate-200 space-y-1">
+                    <div className="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1">
+                      <span>🤖</span> Multimodal Vision Response:
+                    </div>
+                    <div className="text-xs leading-relaxed whitespace-pre-wrap">{figAnswer}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

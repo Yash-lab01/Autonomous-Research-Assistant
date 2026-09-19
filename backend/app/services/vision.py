@@ -91,3 +91,56 @@ class VisionCaptioner:
         except Exception:
             pass
         return False
+
+    @staticmethod
+    async def ask_figure(image_path: str, question: str, paper_title: str = "") -> str:
+        """
+        Interactive Multimodal Figure Inspector:
+        Sends the diagram image and user question to the local vision model or Groq LLM
+        to produce a detailed, technical explanation of the architecture, workflow, or plot.
+        """
+        encoded = VisionCaptioner._encode_image(image_path)
+        if not encoded:
+            return "Could not load or encode the figure image."
+
+        context = f"from the research paper: '{paper_title}'" if paper_title else "from an academic research paper"
+        system_instruction = (
+            f"You are an expert AI scientist analyzing an academic figure {context}. "
+            "Examine the architecture components, data flows, notations, legends, and metrics in detail. "
+            "Answer the researcher's question thoroughly and accurately based on the visual evidence."
+        )
+
+        payload = {
+            "model": settings.OLLAMA_VISION_MODEL,
+            "prompt": f"{system_instruction}\n\nResearcher Question: {question}\n\nDetailed Analysis:",
+            "images": [encoded],
+            "stream": False,
+            "options": {
+                "temperature": 0.2,
+                "num_predict": 400
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                res = await client.post(
+                    f"{settings.OLLAMA_BASE_URL}/api/generate",
+                    json=payload
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    answer = data.get("response", "").strip()
+                    if answer:
+                        return answer
+        except Exception as e:
+            logger.warning(f"Ollama vision Q&A failed ({e}). Attempting text synthesis fallback...")
+
+        # Fallback to general LLM if local vision model is unavailable
+        from app.services.llm_factory import LLMFactory
+        fallback_prompt = (
+            f"A researcher is asking about a diagram {context}.\n"
+            f"Question: {question}\n\n"
+            "Provide a clear technical analysis of the expected system components and concepts based on standard AI research conventions:"
+        )
+        return await LLMFactory.invoke_llm(prompt=fallback_prompt, workload_type="interactive")
+

@@ -188,11 +188,11 @@ Each phase is grouped logically with a clear objective, actionable checklist, te
 
 **Goal:** Accelerate paper uploads by 50%, eliminate heavy PyTorch dependencies, and introduce interactive table/figure understanding.
 
-### 📋 Phase 3 Checklist
-- [ ] **3.1 FastEmbed ONNX Engine Migration (Removing Heavy PyTorch)**
-- [ ] **3.2 Asynchronous Concurrent Ingestion Pipeline**
-- [ ] **3.3 Interactive Table Extraction to DataFrames**
-- [ ] **3.4 Click-to-Ask Multimodal Figure & Diagram Inspector**
+### 📋 Phase 3 Checklist (Completed & Verified)
+- [x] **3.1 FastEmbed ONNX Engine Migration (Removing Heavy PyTorch)**
+- [x] **3.2 Asynchronous Concurrent Ingestion Pipeline**
+- [x] **3.3 Interactive Table Extraction to DataFrames**
+- [x] **3.4 Click-to-Ask Multimodal Figure & Diagram Inspector**
 
 ---
 

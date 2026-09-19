@@ -20,6 +20,15 @@ class ParagraphChunk(BaseModel):
     text: str
     section_name: Optional[str] = None
 
+class ExtractedTable(BaseModel):
+    table_id: str
+    paper_id: str
+    page_number: int
+    headers: List[str] = Field(default_factory=list)
+    rows: List[List[str]] = Field(default_factory=list)
+    markdown: str = ""
+    caption: Optional[str] = None
+
 class StructuredPaperExtraction(BaseModel):
     title: str = Field(description="Title of the research paper")
     abstract: str = Field(description="Abstract summary")

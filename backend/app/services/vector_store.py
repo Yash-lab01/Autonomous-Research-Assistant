@@ -84,17 +84,28 @@ class VectorStoreService:
     def __init__(self):
         self.qdrant_client = None
         self.encoder = None
+        self.encoder_type = None
         self.in_memory_store: List[Dict[str, Any]] = []
         self.bm25_index = BM25Index()
         self._init_client()
 
     def _init_client(self):
         try:
-            from sentence_transformers import SentenceTransformer
-            self.encoder = SentenceTransformer("all-MiniLM-L6-v2")
-            logger.info("SentenceTransformer encoder 'all-MiniLM-L6-v2' loaded successfully.")
-        except Exception as e:
-            logger.warning(f"Could not load SentenceTransformer locally ({e}). RAG will use fallback BM25 search.")
+            from fastembed import TextEmbedding
+            self.encoder = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+            self.encoder_type = "fastembed"
+            logger.info("FastEmbed ONNX encoder 'BAAI/bge-small-en-v1.5' loaded successfully.")
+        except Exception as fe_err:
+            logger.warning(f"Could not load FastEmbed ({fe_err}), falling back to SentenceTransformer.")
+            try:
+                from sentence_transformers import SentenceTransformer
+                self.encoder = SentenceTransformer("all-MiniLM-L6-v2")
+                self.encoder_type = "sentence_transformers"
+                logger.info("SentenceTransformer encoder 'all-MiniLM-L6-v2' loaded successfully.")
+            except Exception as st_err:
+                logger.warning(f"Could not load SentenceTransformer ({st_err}). RAG will use fallback BM25 search.")
+                self.encoder = None
+                self.encoder_type = None
 
         try:
             from qdrant_client import QdrantClient
@@ -131,6 +142,24 @@ class VectorStoreService:
             logger.warning(f"Qdrant connection to {settings.QDRANT_URL} unavailable ({e}). Using in-memory Hybrid RAG.")
             self.qdrant_client = None
 
+    def _encode_texts(self, texts: List[str]) -> List[List[float]]:
+        """Generates dense embedding vectors using FastEmbed ONNX or fallback."""
+        if not texts or self.encoder is None:
+            return []
+        try:
+            if self.encoder_type == "fastembed":
+                return [v.tolist() for v in self.encoder.embed(texts)]
+            else:
+                return self.encoder.encode(texts, show_progress_bar=False).tolist()
+        except Exception as e:
+            logger.warning(f"Dense vector encoding error: {e}")
+            return []
+
+    def _encode_single(self, text: str) -> Optional[List[float]]:
+        """Generates a dense vector for a single query string."""
+        res = self._encode_texts([text])
+        return res[0] if res else None
+
     def upsert_paragraphs(self, paragraphs: List[ParagraphChunk]):
         if not paragraphs:
             return
@@ -151,7 +180,7 @@ class VectorStoreService:
 
         if self.encoder is not None:
             texts = [p.text for p in paragraphs]
-            embeddings = self.encoder.encode(texts, show_progress_bar=False).tolist()
+            embeddings = self._encode_texts(texts)
             
             # Update vectors in memory store
             for p, emb in zip(paragraphs, embeddings):
@@ -226,7 +255,7 @@ class VectorStoreService:
         bm25_rank_map = {idx: rank for rank, idx in enumerate(bm25_ranked, start=1)}
 
         # ── 2. Dense Semantic Scoring ───────────────────────────────
-        query_vector = self.encoder.encode([query])[0].tolist() if self.encoder is not None else None
+        query_vector = self._encode_single(query)
         dense_scores = {}
         
         for idx in candidate_indices:

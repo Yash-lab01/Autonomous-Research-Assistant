@@ -303,3 +303,56 @@ class HybridPDFParser:
             logger.error(f"Error extracting figures for paper {paper_id}: {e}")
 
         return figures
+
+    @staticmethod
+    def extract_tables_structured(pdf_path: str, paper_id: str) -> List[dict]:
+        """
+        Extracts structured tables with headers and row arrays from a PDF.
+        Returns a list of table dictionaries ready for DataFrame inspection & CSV export.
+        """
+        tables_res: List[dict] = []
+        pdf_file = Path(pdf_path)
+        if not pdf_file.exists():
+            return tables_res
+
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                tbl_idx = 1
+                for page_idx, page in enumerate(pdf.pages, start=1):
+                    raw_tables = page.extract_tables() or []
+                    for t_data in raw_tables:
+                        if not t_data or len(t_data) < 2:
+                            continue
+
+                        def clean_cell(c):
+                            return str(c).replace("\n", " ").strip() if c is not None else ""
+
+                        clean_rows = [[clean_cell(c) for c in row] for row in t_data if any(row)]
+                        if not clean_rows or len(clean_rows) < 2:
+                            continue
+
+                        headers = clean_rows[0]
+                        rows = clean_rows[1:]
+                        md = HybridPDFParser._table_to_markdown(clean_rows)
+
+                        # Exclude degenerate tables (must have at least 2 columns and 1 row)
+                        if len(headers) >= 2 and len(rows) >= 1:
+                            tables_res.append({
+                                "table_id": f"{paper_id}_tbl_p{page_idx}_{tbl_idx}",
+                                "paper_id": paper_id,
+                                "page_number": page_idx,
+                                "headers": headers,
+                                "rows": rows,
+                                "markdown": md,
+                                "caption": f"Table on Page {page_idx} ({len(headers)} cols × {len(rows)} rows)"
+                            })
+                            tbl_idx += 1
+                            if len(tables_res) >= 15:
+                                break
+                    if len(tables_res) >= 15:
+                        break
+        except Exception as e:
+            logger.error(f"Error extracting structured tables from {pdf_path}: {e}")
+
+        return tables_res
+

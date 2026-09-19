@@ -51,6 +51,16 @@ export interface CitationItem {
   verification_reason?: string;
 }
 
+export interface ExtractedTable {
+  table_id: string;
+  paper_id: string;
+  page_number: number;
+  headers: string[];
+  rows: string[][];
+  markdown: string;
+  caption?: string;
+}
+
 export interface ChatResponse {
   intent: string;
   response: string;
@@ -434,4 +444,31 @@ export function streamResearchGaps(
     signal
   );
 }
+
+export async function fetchPaperTables(paperId: string): Promise<{ paper_id: string; table_count: number; tables: ExtractedTable[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/papers/${paperId}/tables`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function askFigureQuestion(
+  paperId: string,
+  question: string,
+  figureId?: string,
+  filePath?: string
+): Promise<{ paper_id: string; figure_id?: string; question: string; answer: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/figures/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paper_id: paperId,
+      figure_id: figureId || null,
+      file_path: filePath || null,
+      question: question
+    })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 

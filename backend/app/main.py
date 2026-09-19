@@ -734,6 +734,61 @@ async def get_vision_status():
         "ollama_url": settings.OLLAMA_BASE_URL
     }
 
+@app.get("/api/papers/{paper_id}/tables")
+def get_paper_tables(paper_id: str, db: Session = Depends(get_db)):
+    """
+    Returns structured tables with headers and rows extracted from a paper's PDF.
+    Ready for DataFrame rendering, sorting, column filtering, and CSV export.
+    """
+    paper = DatabaseService.get_paper_by_id(db, paper_id)
+    if not paper or not paper.local_pdf_path or not Path(paper.local_pdf_path).exists():
+        return {"paper_id": paper_id, "tables": [], "table_count": 0}
+
+    tables = HybridPDFParser.extract_tables_structured(paper.local_pdf_path, paper_id)
+    return {"paper_id": paper_id, "table_count": len(tables), "tables": tables}
+
+class FigureAskRequest(BaseModel):
+    paper_id: str
+    figure_id: Optional[str] = None
+    file_path: Optional[str] = None
+    question: str
+
+@app.post("/api/figures/ask")
+async def ask_figure_analysis(req: FigureAskRequest, db: Session = Depends(get_db)):
+    """
+    Multimodal Figure Q&A:
+    Analyzes neural architecture diagrams, plots, or flowcharts using Vision AI.
+    """
+    paper = DatabaseService.get_paper_by_id(db, req.paper_id)
+    paper_title = paper.title if paper else ""
+
+    image_path = req.file_path
+    if not image_path or not Path(image_path).exists():
+        fig_dir = settings.FIGURES_DIR / req.paper_id
+        if fig_dir.exists():
+            pngs = list(fig_dir.glob("*.png"))
+            if req.figure_id:
+                matched = [p for p in pngs if req.figure_id in p.name]
+                image_path = str(matched[0]) if matched else (str(pngs[0]) if pngs else None)
+            elif pngs:
+                image_path = str(pngs[0])
+
+    if not image_path or not Path(image_path).exists():
+        raise HTTPException(status_code=404, detail="Figure image not found on server")
+
+    answer = await VisionCaptioner.ask_figure(
+        image_path=image_path,
+        question=req.question,
+        paper_title=paper_title
+    )
+    return {
+        "paper_id": req.paper_id,
+        "figure_id": req.figure_id,
+        "question": req.question,
+        "answer": answer
+    }
+
+
 class DigestWebhookRequest(BaseModel):
     topic: str
     max_results: int = 5

@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem, getExportComparisonCSVUrl, fetchProseComparison, streamProseComparison, fetchPaperFigures, PaperFigure } from "@/lib/api";
+import {
+  PaperItem,
+  getExportComparisonCSVUrl,
+  fetchProseComparison,
+  streamProseComparison,
+  fetchPaperFigures,
+  PaperFigure,
+  fetchPaperTables,
+  ExtractedTable
+} from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
 
@@ -89,12 +98,21 @@ function CellValue({ attrKey, paper }: { attrKey: string; paper: PaperItem }) {
 export default function ComparisonTable({ papers }: ComparisonTableProps) {
   const eligiblePapers = papers.filter((p) => p.status === "done" && p.structured_data);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<"table" | "prose">("table");
+  const [viewMode, setViewMode] = useState<"table" | "prose" | "extracted_tables">("table");
   const [proseComparison, setProseComparison] = useState<string | null>(null);
   const [loadingProse, setLoadingProse] = useState(false);
   const [paperFiguresMap, setPaperFiguresMap] = useState<Record<string, PaperFigure[]>>({});
   const [loadingFiguresMap, setLoadingFiguresMap] = useState(false);
   const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; paperTitle: string; pageNumber: number } | null>(null);
+
+  // Extracted Tables state
+  const [extractedTablesMap, setExtractedTablesMap] = useState<Record<string, ExtractedTable[]>>({});
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [activeTablePaperId, setActiveTablePaperId] = useState<string | null>(null);
+  const [activeTableIndex, setActiveTableIndex] = useState<number>(0);
+  const [tableSearchQuery, setTableSearchQuery] = useState<string>("");
+  const [sortCol, setSortCol] = useState<number | null>(null);
+  const [sortAsc, setSortAsc] = useState<boolean>(true);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -131,9 +149,52 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
     setLoadingFiguresMap(false);
   };
 
-  const handleSwitchViewMode = async (mode: "table" | "prose") => {
+  const loadTablesForSelected = async (pids: string[]) => {
+    if (pids.length === 0) return;
+    setLoadingTables(true);
+    const newMap: Record<string, ExtractedTable[]> = { ...extractedTablesMap };
+    await Promise.all(
+      pids.map(async (pid) => {
+        if (!newMap[pid]) {
+          try {
+            const res = await fetchPaperTables(pid);
+            if (res.tables) newMap[pid] = res.tables;
+          } catch (e) {
+            console.error(`Failed to fetch tables for paper ${pid}`, e);
+          }
+        }
+      })
+    );
+    setExtractedTablesMap(newMap);
+    setLoadingTables(false);
+  };
+
+  const exportTableToCSV = (table: ExtractedTable, paperTitle: string) => {
+    const cleanCell = (c: string) => `"${(c || "").replace(/"/g, '""')}"`;
+    const headerRow = table.headers.map(cleanCell).join(",");
+    const dataRows = table.rows.map(row => row.map(cleanCell).join(",")).join("\n");
+    const csvContent = `${headerRow}\n${dataRows}`;
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeTitle = (paperTitle || "table").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${safeTitle}_p${table.page_number}_table.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSwitchViewMode = async (mode: "table" | "prose" | "extracted_tables") => {
     setViewMode(mode);
-    if (mode === "prose" && selectedPapers.length >= 2) {
+    if (mode === "extracted_tables") {
+      const pids = selectedPapers.map((p) => p.id);
+      if (!activeTablePaperId && pids.length > 0) {
+        setActiveTablePaperId(pids[0]);
+      }
+      await loadTablesForSelected(pids);
+    } else if (mode === "prose" && selectedPapers.length >= 2) {
       setLoadingProse(true);
       setProseComparison("");
       try {
@@ -301,10 +362,16 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h3 className="text-base font-bold text-slate-100">
-                  {viewMode === "table" ? "Side-by-Side Table Comparison" : "Structured AI Prose Comparison"}
+                  {viewMode === "table"
+                    ? "Side-by-Side Table Comparison"
+                    : viewMode === "prose"
+                    ? "Structured AI Prose Comparison"
+                    : "Extracted Tables & Benchmark DataFrames"}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Comparative analysis across {selectedPapers.length} selected papers
+                  {viewMode === "extracted_tables"
+                    ? "Interactive sortable DataFrames and benchmarks extracted from paper PDFs"
+                    : `Comparative analysis across ${selectedPapers.length} selected papers`}
                 </p>
               </div>
 
@@ -330,6 +397,16 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                     }`}
                   >
                     📝 Prose Analysis Mode
+                  </button>
+                  <button
+                    onClick={() => handleSwitchViewMode("extracted_tables")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      viewMode === "extracted_tables"
+                        ? "bg-emerald-600 text-white shadow"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    📈 Extracted Tables
                   </button>
                 </div>
 
@@ -447,7 +524,178 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
                 ) : (
                   <div className="text-xs text-slate-500">Click 📝 Prose Analysis Mode to generate the structured comparison.</div>
                 )}
+              </div>
+            )}
 
+            {/* Extracted Tables & DataFrames Mode */}
+            {viewMode === "extracted_tables" && (
+              <div className="p-6 space-y-6">
+                {/* Paper selector buttons */}
+                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
+                  <span className="text-xs font-semibold text-slate-400 shrink-0">Select Paper:</span>
+                  {selectedPapers.map((p) => {
+                    const isCurrent = (activeTablePaperId || selectedPapers[0]?.id) === p.id;
+                    const tablesForP = extractedTablesMap[p.id] || [];
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setActiveTablePaperId(p.id);
+                          setActiveTableIndex(0);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all shrink-0 flex items-center gap-2 ${
+                          isCurrent
+                            ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/50 shadow-sm"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        <span className="truncate max-w-[160px]">{p.title}</span>
+                        <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-emerald-400">
+                          {tablesForP.length}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active paper's tables */}
+                {(() => {
+                  const currentPid = activeTablePaperId || selectedPapers[0]?.id;
+                  const currentPaper = selectedPapers.find(p => p.id === currentPid);
+                  const tables = currentPid ? (extractedTablesMap[currentPid] || []) : [];
+
+                  if (loadingTables) {
+                    return (
+                      <div className="p-10 text-center text-slate-400 space-y-3">
+                        <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                        <p className="text-xs font-mono">Extracting structured DataFrames from PDF pages...</p>
+                      </div>
+                    );
+                  }
+
+                  if (tables.length === 0) {
+                    return (
+                      <div className="p-10 text-center text-slate-500 space-y-2 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <p className="text-2xl">📋</p>
+                        <p className="text-sm font-semibold text-slate-400">No structured tables detected in this paper</p>
+                        <p className="text-xs text-slate-500">The PDF may contain rasterized image tables or unstructured text layouts.</p>
+                      </div>
+                    );
+                  }
+
+                  const activeTable = tables[activeTableIndex] || tables[0];
+
+                  // Filter rows by tableSearchQuery
+                  const filteredRows = activeTable.rows.filter(row =>
+                    !tableSearchQuery.trim() ||
+                    row.some(cell => cell.toLowerCase().includes(tableSearchQuery.toLowerCase()))
+                  );
+
+                  // Sort rows if sortCol is set
+                  const sortedRows = [...filteredRows].sort((a, b) => {
+                    if (sortCol === null) return 0;
+                    const valA = (a[sortCol] || "").trim();
+                    const valB = (b[sortCol] || "").trim();
+
+                    const numA = parseFloat(valA.replace(/[^0-9.-]/g, ""));
+                    const numB = parseFloat(valB.replace(/[^0-9.-]/g, ""));
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                      return sortAsc ? numA - numB : numB - numA;
+                    }
+                    return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                  });
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Table Header Bar: Tabs, Search, Export */}
+                      <div className="flex items-center justify-between flex-wrap gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar">
+                          {tables.map((tbl, tIdx) => (
+                            <button
+                              key={tbl.table_id}
+                              onClick={() => {
+                                setActiveTableIndex(tIdx);
+                                setSortCol(null);
+                              }}
+                              className={`px-3 py-1 rounded-lg text-xs font-mono transition-all shrink-0 ${
+                                activeTableIndex === tIdx
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold"
+                                  : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                              }`}
+                            >
+                              Table {tIdx + 1} (p.{tbl.page_number})
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+                          <input
+                            type="text"
+                            value={tableSearchQuery}
+                            onChange={e => setTableSearchQuery(e.target.value)}
+                            placeholder="Filter table rows..."
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 w-44"
+                          />
+                          <button
+                            onClick={() => exportTableToCSV(activeTable, currentPaper?.title || "paper")}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0"
+                            title="Download this table as a CSV spreadsheet"
+                          >
+                            <span>⬇️</span> Export CSV
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Interactive DataFrame Table */}
+                      <div className="overflow-x-auto custom-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-xl">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-800 bg-slate-900/90">
+                              <th className="p-3 text-slate-500 font-mono w-12 text-center">#</th>
+                              {activeTable.headers.map((h, colIdx) => (
+                                <th
+                                  key={colIdx}
+                                  onClick={() => {
+                                    if (sortCol === colIdx) {
+                                      setSortAsc(!sortAsc);
+                                    } else {
+                                      setSortCol(colIdx);
+                                      setSortAsc(true);
+                                    }
+                                  }}
+                                  className="p-3 text-slate-300 font-semibold cursor-pointer hover:bg-slate-800/80 transition-colors select-none group"
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{h}</span>
+                                    <span className="text-[10px] text-slate-500 group-hover:text-emerald-400">
+                                      {sortCol === colIdx ? (sortAsc ? "▲" : "▼") : "↕"}
+                                    </span>
+                                  </div>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-850 font-mono">
+                            {sortedRows.map((row, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-slate-900/50 transition-colors">
+                                <td className="p-3 text-slate-600 text-center font-mono text-[10px]">{rIdx + 1}</td>
+                                {row.map((cell, cIdx) => (
+                                  <td key={cIdx} className="p-3 text-slate-300 whitespace-nowrap">
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono px-1">
+                        <span>Showing {sortedRows.length} of {activeTable.rows.length} rows · {activeTable.headers.length} columns</span>
+                        <span>Click column headers to sort ascending / descending</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -496,8 +744,6 @@ export default function ComparisonTable({ papers }: ComparisonTableProps) {
           </div>
         </div>
       )}
-
-      {/* Lightbox Modal for Figure Strip */}
       {activeLightboxFig && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="glass-panel-glow max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col">

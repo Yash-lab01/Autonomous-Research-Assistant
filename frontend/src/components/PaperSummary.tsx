@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { PaperItem, fetchSinglePaperSummary, fetchCombinedSummary, streamSinglePaperSummary, streamCombinedSummary, fetchPaperFigures, PaperFigure } from "@/lib/api";
+import {
+  PaperItem,
+  fetchSinglePaperSummary,
+  fetchCombinedSummary,
+  streamSinglePaperSummary,
+  streamCombinedSummary,
+  fetchPaperFigures,
+  PaperFigure,
+  askFigureQuestion
+} from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StreamedMarkdown from "@/components/StreamedMarkdown";
 
@@ -21,7 +30,17 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
 
   const [allFigures, setAllFigures] = useState<{ paperTitle: string; figure: PaperFigure }[]>([]);
   const [selectedFigureIds, setSelectedFigureIds] = useState<Set<string>>(new Set());
-  const [activeLightboxFig, setActiveLightboxFig] = useState<{ url: string; caption: string; paperTitle: string; pageNumber: number } | null>(null);
+  const [activeLightboxFig, setActiveLightboxFig] = useState<{
+    url: string;
+    caption: string;
+    paperTitle: string;
+    paperId?: string;
+    figureId?: string;
+    pageNumber: number;
+  } | null>(null);
+  const [figQuestion, setFigQuestion] = useState("");
+  const [figAnswer, setFigAnswer] = useState<string | null>(null);
+  const [figLoading, setFigLoading] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -151,6 +170,24 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
       else next.add(figId);
       return next;
     });
+  };
+
+  const handleAskFigure = async (customQ?: string) => {
+    const query = customQ || figQuestion;
+    if (!query.trim() || !activeLightboxFig?.paperId || !activeLightboxFig?.figureId) return;
+    setFigLoading(true);
+    try {
+      const res = await askFigureQuestion(
+        activeLightboxFig.paperId,
+        activeLightboxFig.figureId,
+        query.trim()
+      );
+      setFigAnswer(res.answer);
+    } catch (err: any) {
+      setFigAnswer(`⚠️ Failed to analyze diagram: ${err.message || err}`);
+    } finally {
+      setFigLoading(false);
+    }
   };
 
   const handleDownloadMarkdown = () => {
@@ -400,12 +437,18 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
                       </div>
 
                       <button
-                        onClick={() => setActiveLightboxFig({
-                          url: `${API_BASE}${item.figure.url}`,
-                          caption: item.figure.caption,
-                          paperTitle: item.paperTitle,
-                          pageNumber: item.figure.page_number
-                        })}
+                        onClick={() => {
+                          setActiveLightboxFig({
+                            url: `${API_BASE}${item.figure.url}`,
+                            caption: item.figure.caption,
+                            paperTitle: item.paperTitle,
+                            paperId: item.figure.paper_id,
+                            figureId: item.figure.figure_id,
+                            pageNumber: item.figure.page_number
+                          });
+                          setFigQuestion("");
+                          setFigAnswer(null);
+                        }}
                         className="w-full aspect-video rounded-lg overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center group-hover:border-purple-500/60 transition-all relative"
                       >
                         <img
@@ -414,7 +457,7 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
-                          🔍 Click for Lightbox
+                          🔍 Click for Lightbox & Q&A
                         </div>
                       </button>
                       <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{item.figure.caption}</p>
@@ -430,11 +473,11 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
       {/* Lightbox Modal */}
       {activeLightboxFig && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className="glass-panel max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col border border-purple-500/40 shadow-2xl">
+          <div className="glass-panel max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col border border-purple-500/40 shadow-2xl overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-slate-100">{activeLightboxFig.paperTitle}</h4>
-                <p className="text-xs text-purple-400 font-mono">Page {activeLightboxFig.pageNumber} · Diagram Preview</p>
+                <p className="text-xs text-purple-400 font-mono">Page {activeLightboxFig.pageNumber} · Diagram Preview & Multimodal Inspector</p>
               </div>
               <button
                 onClick={() => setActiveLightboxFig(null)}
@@ -443,16 +486,93 @@ export default function PaperSummary({ papers }: PaperSummaryProps) {
                 ✕ Close
               </button>
             </div>
-            <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-950 rounded-xl p-4 border border-slate-800">
+            <div className="flex-1 min-h-[220px] max-h-[45vh] overflow-auto flex items-center justify-center bg-slate-950 rounded-xl p-4 border border-slate-800">
               <img
                 src={activeLightboxFig.url}
                 alt={activeLightboxFig.caption}
-                className="max-h-[60vh] object-contain rounded-lg"
+                className="max-h-[40vh] object-contain rounded-lg"
               />
             </div>
-            <div className="bg-slate-900/90 p-4 rounded-xl border border-purple-500/30 text-xs text-slate-300 leading-relaxed">
+            <div className="bg-slate-900/90 p-3 rounded-xl border border-purple-500/30 text-xs text-slate-300 leading-relaxed">
               <span className="font-semibold text-purple-300 block mb-1">🤖 AI Vision Caption Analysis</span>
               {activeLightboxFig.caption}
+            </div>
+
+            {/* Interactive Figure Inspector Q&A Drawer */}
+            <div className="bg-slate-900/90 p-4 rounded-xl border border-purple-500/30 text-xs text-slate-300 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-purple-300 flex items-center gap-1.5">
+                  <span>💬</span> Ask Questions About This Diagram / Architecture Chart
+                </span>
+                {activeLightboxFig.figureId && (
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    ID: {activeLightboxFig.figureId}
+                  </span>
+                )}
+              </div>
+
+              {/* Quick question prompt chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "Explain what this diagram illustrates",
+                  "What are the key axes, trends, or components?",
+                  "Summarize the architecture workflow depicted"
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    onClick={() => handleAskFigure(chip)}
+                    disabled={figLoading || !activeLightboxFig.paperId || !activeLightboxFig.figureId}
+                    className="px-2.5 py-1 rounded-md bg-purple-950/40 text-purple-300 border border-purple-800/40 hover:bg-purple-900/50 hover:border-purple-600/60 text-[11px] transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    ✨ {chip}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Question input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. What does the blue bar indicate in step 3?"
+                  value={figQuestion}
+                  onChange={(e) => setFigQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAskFigure();
+                    }
+                  }}
+                  disabled={figLoading || !activeLightboxFig.paperId || !activeLightboxFig.figureId}
+                  className="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                />
+                <button
+                  onClick={() => handleAskFigure()}
+                  disabled={figLoading || !figQuestion.trim() || !activeLightboxFig.paperId || !activeLightboxFig.figureId}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-lg text-xs transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  {figLoading ? (
+                    <>
+                      <span className="animate-spin text-xs">🌀</span>
+                      <span>Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Ask Vision AI</span>
+                      <span>⚡</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Answer display */}
+              {figAnswer && (
+                <div className="p-3 bg-purple-950/40 border border-purple-500/40 rounded-lg text-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1">
+                    <span>🤖</span> Multimodal Vision Response:
+                  </div>
+                  <div className="text-xs leading-relaxed whitespace-pre-wrap">{figAnswer}</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
