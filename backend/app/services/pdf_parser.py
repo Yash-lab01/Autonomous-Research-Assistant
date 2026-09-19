@@ -1,7 +1,7 @@
 import re
 import logging
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import pdfplumber
 import PyPDF2
 from app.models.paper import ParagraphChunk
@@ -16,6 +16,20 @@ MATH_PATTERN = re.compile(
     re.DOTALL
 )
 
+# Academic Section Heading Patterns (Arabic or Roman numerals, or plain words)
+SECTION_PATTERNS = [
+    (re.compile(r'^(?:abstract)\b', re.IGNORECASE), "abstract"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:introduction|overview|background\s+and\s+overview)\b', re.IGNORECASE), "introduction"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:related\s+work|background|literature\s+review|prior\s+work)\b', re.IGNORECASE), "related_work"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:(?:proposed|our|the)\s+)?(?:methodology|methods|method|approach|architecture|framework|model|system|pipeline)\b', re.IGNORECASE), "methodology"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:experiments|experimental\s+setup|evaluation|results|findings|empirical\s+analysis|benchmarks)\b', re.IGNORECASE), "results"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:discussion|ablation|ablations|analysis|case\s+study)\b', re.IGNORECASE), "discussion"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:limitations|broader\s+impacts?|ethical\s+considerations?)\b', re.IGNORECASE), "limitations"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:conclusions?|concluding\s+remarks|summary)\b', re.IGNORECASE), "conclusion"),
+    (re.compile(r'^(?:[0-9IVXLCDM]+\.?\s*)?(?:references|bibliography)\b', re.IGNORECASE), "references"),
+    (re.compile(r'^(?:(?:[0-9a-zIVXLCDM]+\.?\s*)?(?:appendix|supplementary(?:\s+material)?)|appendix\s+[a-z0-9]+)\b', re.IGNORECASE), "appendix"),
+]
+
 class HybridPDFParser:
     """
     Two-Stage Hybrid PDF Parser:
@@ -23,6 +37,17 @@ class HybridPDFParser:
       Tables are converted to Markdown and tagged [TABLE]. Math-heavy paragraphs tagged [MATH].
     - Stage 2 (Docling Fallback): Layout-aware parsing for multi-column / complex PDFs.
     """
+
+    @staticmethod
+    def detect_section_header(line: str) -> Optional[str]:
+        """Identifies if a text line corresponds to a standard academic paper section header."""
+        clean = line.strip().strip('#*').strip()
+        if not clean or len(clean) > 80:
+            return None
+        for pattern, section_name in SECTION_PATTERNS:
+            if pattern.search(clean):
+                return section_name
+        return None
 
     @staticmethod
     def parse_pdf(pdf_path: str, paper_id: str) -> Tuple[List[ParagraphChunk], str]:
@@ -92,6 +117,7 @@ class HybridPDFParser:
         total_chars = 0
         total_pages = 0
         current_paragraph_id = 1
+        active_section = "general"
 
         try:
             with pdfplumber.open(pdf_path) as pdf:
@@ -138,7 +164,21 @@ class HybridPDFParser:
 
                     raw_paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
                     for p_text in raw_paragraphs:
-                        clean_text = " ".join(p_text.split())
+                        lines = [line.strip() for line in p_text.split("\n") if line.strip()]
+                        if lines:
+                            detected = HybridPDFParser.detect_section_header(lines[0])
+                            if detected:
+                                active_section = detected
+                                if len(lines) == 1:
+                                    # Header on its own line: section state updated, skip empty paragraph
+                                    continue
+                                p_body = " ".join(lines[1:])
+                            else:
+                                p_body = " ".join(lines)
+                        else:
+                            p_body = p_text
+
+                        clean_text = " ".join(p_body.split())
                         if len(clean_text) > 30:
                             # Tag math-heavy paragraphs so LLMs & renderer handle them specially
                             prefix = "[MATH] " if HybridPDFParser._is_math_heavy(clean_text) else ""
@@ -148,7 +188,7 @@ class HybridPDFParser:
                                 page_number=page_idx,
                                 paragraph_id=current_paragraph_id,
                                 text=f"{prefix}{clean_text}",
-                                section_name="math" if prefix else None
+                                section_name=active_section
                             )
                             chunks.append(chunk)
                             current_paragraph_id += 1
@@ -175,22 +215,31 @@ class HybridPDFParser:
 
             chunks: List[ParagraphChunk] = []
             paragraph_id = 1
+            active_section = "general"
 
             for node, level in doc.iterate_items():
-                if hasattr(node, "text") and node.text and len(node.text.strip()) > 30:
-                    page_no = getattr(node, "prov", [None])[0].page_no if getattr(node, "prov", None) else 1
-                    clean_text = " ".join(node.text.split())
-                    prefix = "[MATH] " if HybridPDFParser._is_math_heavy(clean_text) else ""
-                    chunk = ParagraphChunk(
-                        id=f"{paper_id}_p{page_no}_g{paragraph_id}",
-                        paper_id=paper_id,
-                        page_number=page_no,
-                        paragraph_id=paragraph_id,
-                        text=f"{prefix}{clean_text}",
-                        section_name="math" if prefix else None
-                    )
-                    chunks.append(chunk)
-                    paragraph_id += 1
+                if hasattr(node, "text") and node.text:
+                    raw = node.text.strip()
+                    detected = HybridPDFParser.detect_section_header(raw)
+                    if detected:
+                        active_section = detected
+                        if len(raw) < 40:
+                            continue
+
+                    if len(raw) > 30:
+                        page_no = getattr(node, "prov", [None])[0].page_no if getattr(node, "prov", None) else 1
+                        clean_text = " ".join(raw.split())
+                        prefix = "[MATH] " if HybridPDFParser._is_math_heavy(clean_text) else ""
+                        chunk = ParagraphChunk(
+                            id=f"{paper_id}_p{page_no}_g{paragraph_id}",
+                            paper_id=paper_id,
+                            page_number=page_no,
+                            paragraph_id=paragraph_id,
+                            text=f"{prefix}{clean_text}",
+                            section_name=active_section
+                        )
+                        chunks.append(chunk)
+                        paragraph_id += 1
             return chunks
         except ImportError:
             logger.debug("Docling library is not installed. Skipping layout-aware fallback.")

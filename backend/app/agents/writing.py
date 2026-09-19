@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from sqlalchemy.orm import Session
@@ -77,6 +78,67 @@ class WritingAgent:
             return await WritingAgent._generate_qa_response(state)
 
     @staticmethod
+    def _verify_citations(response_text: str, citations: List[dict]) -> List[dict]:
+        """
+        Post-generation verification loop:
+        Extracts metrics, numerical claims, and key technical concepts from the generated response
+        and verifies whether they are grounded in the cited paragraph text snippets.
+        Annotates each citation with:
+          - verified: bool
+          - grounding_score: float (0.0 to 1.0)
+          - verification_reason: str
+        """
+        if not citations:
+            return citations
+
+        num_pattern = re.compile(r'\b\d+(?:\.\d+)?%?(?:x|k|m|b)?\b', re.IGNORECASE)
+        answer_nums = set(num_pattern.findall(response_text.lower()))
+
+        stop_words = {
+            "this", "that", "with", "from", "were", "been", "have", "more", "also", "using",
+            "used", "paper", "which", "their", "these", "those", "about", "above", "across",
+            "after", "again", "against", "all", "almost", "alone", "along", "already", "also",
+            "although", "always", "among", "an", "and", "another", "any", "anybody", "anyone"
+        }
+        answer_words = {w for w in re.findall(r'[a-z0-9_\-]+', response_text.lower()) if len(w) >= 4 and w not in stop_words}
+
+        verified_citations = []
+        for c in citations:
+            snippet = (c.get("text") or "").lower()
+            snippet_nums = set(num_pattern.findall(snippet))
+
+            # 1. Match significant numerical metrics
+            matched_nums = answer_nums.intersection(snippet_nums)
+            significant_matched_nums = {n for n in matched_nums if not (n.isdigit() and int(n) < 5)}
+
+            # 2. Match terminology overlap
+            snippet_words = {w for w in re.findall(r'[a-z0-9_\-]+', snippet) if len(w) >= 4 and w not in stop_words}
+            overlap = answer_words.intersection(snippet_words)
+            jaccard = len(overlap) / max(len(answer_words), 1)
+
+            if significant_matched_nums:
+                verified = True
+                score = min(1.0, 0.75 + (len(significant_matched_nums) * 0.08))
+                sample_nums = ", ".join(sorted(significant_matched_nums)[:3])
+                reason = f"Numerical metrics verified in source text ({sample_nums})"
+            elif jaccard > 0.08 or len(overlap) >= 5:
+                verified = True
+                score = min(1.0, round(jaccard * 3.5, 2))
+                reason = f"Key technical concepts grounded in source ({len(overlap)} matching concepts)"
+            else:
+                verified = False
+                score = min(0.4, round(jaccard * 2.0, 2))
+                reason = "Low lexical grounding in cited paragraph"
+
+            c_updated = dict(c)
+            c_updated["verified"] = verified
+            c_updated["grounding_score"] = round(score, 2)
+            c_updated["verification_reason"] = reason
+            verified_citations.append(c_updated)
+
+        return verified_citations
+
+    @staticmethod
     async def _generate_qa_response(state: ResearchAgentState) -> ResearchAgentState:
         query = state.user_query
         chunks = state.retrieved_paragraphs
@@ -91,7 +153,8 @@ class WritingAgent:
         citations_list = []
 
         for idx, c in enumerate(chunks, start=1):
-            tag = f"[Citation {idx}: Paper {c['paper_id']}, p.{c['page_number']}]"
+            sec_label = f", [{c.get('section_name', 'general')}]" if c.get('section_name') else ""
+            tag = f"[Citation {idx}: Paper {c['paper_id']}, p.{c['page_number']}{sec_label}]"
             snippet = (c.get('text') or "")[:750].strip()
             context_blocks.append(f"{tag}\n\"{snippet}\"")
             citations_list.append({
@@ -99,7 +162,8 @@ class WritingAgent:
                 "paper_id": c["paper_id"],
                 "page_number": c["page_number"],
                 "paragraph_id": c["paragraph_id"],
-                "text": c["text"]
+                "text": c["text"],
+                "section_name": c.get("section_name", "general")
             })
 
         formatted_context = "\n\n".join(context_blocks)
@@ -112,9 +176,15 @@ class WritingAgent:
             temperature=0.2
         )
 
+        verified_citations = WritingAgent._verify_citations(response, citations_list)
+        verified_count = sum(1 for c in verified_citations if c.get("verified"))
+
         state.final_response = response
-        state.citations = citations_list
-        state.step_logs.append(f"[Writing Agent] Synthesized response with {len(citations_list)} inline citations.")
+        state.citations = verified_citations
+        state.step_logs.append(
+            f"[Writing Agent] Synthesized response with {len(verified_citations)} inline citations "
+            f"({verified_count}/{len(verified_citations)} verified grounded in source)."
+        )
         return state
 
     @staticmethod

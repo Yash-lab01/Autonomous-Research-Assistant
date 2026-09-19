@@ -355,14 +355,30 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
               {/* Citations List Badges */}
               {m.citations && m.citations.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-400">Verified Citations:</span>
+                  <span className="text-xs font-semibold text-slate-400">Sources:</span>
                   {m.citations.map((c, cIdx) => (
                     <button
                       key={cIdx}
                       onClick={() => setActiveCitation(c)}
-                      className="px-2 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-mono transition-colors"
+                      className={`px-2 py-0.5 rounded border text-xs font-mono transition-colors flex items-center gap-1.5 ${
+                        c.verified
+                          ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                          : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/30"
+                      }`}
+                      title={c.verification_reason || (c.verified ? "Grounded in source text" : "Referenced citation")}
                     >
-                      📌 [{c.citation_id}] Paper {c.paper_id.slice(-4)}, p.{c.page_number}
+                      {c.verified ? (
+                        <span className="text-[10px] text-emerald-400 font-bold">✓</span>
+                      ) : (
+                        <span>📌</span>
+                      )}
+                      <span>[{c.citation_id}]</span>
+                      {c.section_name && c.section_name !== "general" && (
+                        <span className="text-[9px] uppercase px-1 py-0.2 bg-slate-800 text-slate-300 rounded">
+                          {c.section_name}
+                        </span>
+                      )}
+                      <span>p.{c.page_number}</span>
                     </button>
                   ))}
                 </div>
@@ -436,9 +452,20 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-panel-glow max-w-lg w-full rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h4 className="font-bold text-slate-100 flex items-center gap-2">
-                📌 Verified Citation Anchor
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                  📌 Source Paragraph Inspector
+                </h4>
+                {activeCitation.verified ? (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                    ✓ Grounding Verified
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-1">
+                    Referenced
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => setActiveCitation(null)}
                 className="text-slate-400 hover:text-white"
@@ -447,9 +474,34 @@ export default function ChatInterface({ papers }: ChatInterfaceProps) {
               </button>
             </div>
 
-            <div className="space-y-2 text-xs font-mono text-slate-400">
-              <div>Paper ID: <span className="text-blue-400">{activeCitation.paper_id}</span></div>
-              <div>Location: <span className="text-blue-400">Page {activeCitation.page_number}, Paragraph {activeCitation.paragraph_id}</span></div>
+            <div className="space-y-1.5 text-xs font-mono text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-850">
+              <div className="flex justify-between">
+                <span>Paper ID:</span>
+                <span className="text-blue-400">{activeCitation.paper_id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Location:</span>
+                <span className="text-blue-400">Page {activeCitation.page_number}, Paragraph {activeCitation.paragraph_id}</span>
+              </div>
+              {activeCitation.section_name && activeCitation.section_name !== "general" && (
+                <div className="flex justify-between">
+                  <span>Academic Section:</span>
+                  <span className="text-purple-400 uppercase font-bold">{activeCitation.section_name}</span>
+                </div>
+              )}
+              {activeCitation.grounding_score !== undefined && (
+                <div className="flex justify-between">
+                  <span>Grounding Score:</span>
+                  <span className={activeCitation.verified ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                    {Math.round(activeCitation.grounding_score * 100)}%
+                  </span>
+                </div>
+              )}
+              {activeCitation.verification_reason && (
+                <div className="pt-1.5 border-t border-slate-800/80 text-[11px] text-slate-300 font-sans italic">
+                  🔍 {activeCitation.verification_reason}
+                </div>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 leading-relaxed max-h-60 overflow-y-auto custom-scrollbar italic">

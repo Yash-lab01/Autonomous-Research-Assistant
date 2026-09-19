@@ -45,6 +45,10 @@ export interface CitationItem {
   page_number: number;
   paragraph_id: number;
   text: string;
+  section_name?: string;
+  verified?: boolean;
+  grounding_score?: number;
+  verification_reason?: string;
 }
 
 export interface ChatResponse {

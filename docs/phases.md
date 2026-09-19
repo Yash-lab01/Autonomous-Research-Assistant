@@ -109,11 +109,11 @@ Each phase is grouped logically with a clear objective, actionable checklist, te
 
 **Goal:** Transform answer quality from generic summaries into rigorous, publication-grade academic analysis with zero hallucinations and exact citation grounding.
 
-### 📋 Phase 2 Checklist
-- [ ] **2.1 Hybrid Search (Dense Vectors + BM25 Lexical via Reciprocal Rank Fusion)**
-- [ ] **2.2 Cross-Encoder Re-Ranking (FlashRank / BGE-Reranker in ONNX)**
-- [ ] **2.3 Section-Aware Hierarchical AST Chunking**
-- [ ] **2.4 Citation Fact-Check & Metric Verification Loop**
+### 📋 Phase 2 Checklist (Completed & Verified)
+- [x] **2.1 Hybrid Search (Dense Vectors + BM25 Lexical via Reciprocal Rank Fusion)**
+- [x] **2.2 Cross-Encoder Re-Ranking (CrossEncoder ms-marco-MiniLM-L-6-v2)**
+- [x] **2.3 Section-Aware Hierarchical AST Chunking**
+- [x] **2.4 Citation Fact-Check & Metric Verification Loop**
 
 ---
 

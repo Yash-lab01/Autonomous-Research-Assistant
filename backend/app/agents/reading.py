@@ -1,6 +1,7 @@
 import logging
 from app.agents.state import ResearchAgentState
 from app.services.vector_store import vector_store
+from app.services.reranker import reranker
 
 logger = logging.getLogger("ai_research_os.reading_agent")
 
@@ -10,20 +11,34 @@ class ReadingAgent:
     async def execute(state: ResearchAgentState) -> ResearchAgentState:
         query = state.user_query
         paper_ids = state.paper_ids
-        state.step_logs.append(f"[Reading Agent] Searching vector store RAG for query: '{query}'")
+        state.step_logs.append(f"[Reading Agent] Executing Hybrid Search (Dense + BM25 RRF) for: '{query}'")
 
         try:
-            chunks = vector_store.search_paragraphs(
+            # Stage 1: Retrieve candidate pool using Hybrid Search (Dense + BM25)
+            candidates = vector_store.search_paragraphs(
                 query=query,
                 paper_ids=paper_ids if paper_ids else None,
-                top_k=6
+                top_k=15
             )
-            state.retrieved_paragraphs = chunks
-            state.step_logs.append(f"[Reading Agent] Retrieved {len(chunks)} paragraph chunks with citation anchors.")
+            state.step_logs.append(f"[Reading Agent] Retrieved {len(candidates)} candidates via Hybrid RRF.")
 
-            # Figure-aware RAG: collect unique (paper_id, page_number) pairs from retrieved chunks
+            # Stage 2: Cross-Encoder Re-Ranking
+            if candidates:
+                state.step_logs.append("[Reading Agent] Applying Cross-Encoder joint attention re-ranking...")
+                reranked_chunks = reranker.rerank(
+                    query=query,
+                    chunks=candidates,
+                    top_k=5
+                )
+            else:
+                reranked_chunks = []
+
+            state.retrieved_paragraphs = reranked_chunks
+            state.step_logs.append(f"[Reading Agent] Selected top {len(reranked_chunks)} high-precision paragraphs.")
+
+            # Figure-aware RAG: collect unique (paper_id, page_number) pairs from cited chunks
             paper_pages_map = {}
-            for c in chunks:
+            for c in reranked_chunks:
                 pid = c.get("paper_id")
                 page = c.get("page_number")
                 if pid and page:
@@ -51,7 +66,7 @@ class ReadingAgent:
             finally:
                 db.close()
 
-            state.figures_cited = figures_found[:4] # Cap at top 4 most relevant figures
+            state.figures_cited = figures_found[:4]
             if figures_found:
                 state.step_logs.append(f"[Reading Agent] Matched {len(state.figures_cited)} relevant figures from cited pages.")
 
