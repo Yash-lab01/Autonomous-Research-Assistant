@@ -17,6 +17,7 @@ For any AI model or developer new to this repository, read the files in the foll
 | **[05_current_problems_and_solutions.md](file:///docs/05_current_problems_and_solutions.md)** | **Current Problems & Solutions (Issue Registry)** | Living registry of all active/historical issues: Groq 8k TPM limit & 4 strategic architectures, offline Ollama protocol error, simulated vs real SSE streaming, and technical acronym retrieval. |
 | **[06_past_present_future.md](file:///docs/06_past_present_future.md)** | **Timeline & Project Roadmap** | Chronological record of Past (v1 prototype), Present (v2 unified 3 pillars), and Future (v3 planned features, Zotero sync, autonomous literature search). |
 | **[07_backend_analysis_and_upgrades.md](file:///docs/07_backend_analysis_and_upgrades.md)** | **Backend Analysis, Upgrades & Benchmarks** | Deep audit comparing backend against Consensus, Elicit, SciSpace, and NotebookLM; technical upgrades to maximize answer quality, boost inference speed (TTFT), and add research superpowers. |
+| **[phases.md](file:///docs/phases.md)** | **Execution Phases & Roadmap** | Actionable engineering checklists and technical implementation blueprints grouped into 4 distinct phases (Speed, Answer Quality, Ingestion Throughput, Platform Parity). |
 
 ---
 
