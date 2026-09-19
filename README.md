@@ -79,13 +79,31 @@
 
 ## 🚀 Quick Start
 
-### Option 1 — Single Script (Recommended)
+### Option 1 — One-Click Startup (`.bat` — Recommended for Windows)
+
+Double-click **`start_all.bat`** in File Explorer, or run it from your terminal:
+
+```powershell
+# Starts both Backend (with Docker Qdrant) and Frontend in parallel windows
+.\start_all.bat
+```
+
+Or run the services individually:
+- **Backend & Vector DB:** `.\start_backend.bat` (starts Qdrant container, creates/activates `venv`, installs `requirements.txt`, runs FastAPI on port 8000)
+- **Frontend App:** `.\start_frontend.bat` (installs `npm` packages and starts Next.js on port 3000)
+
+---
+
+### Option 2 — PowerShell Script
 ```powershell
 .\start.ps1
 ```
 Validates `.env`, checks Ollama & Qdrant health, then starts both services with streamed logs.
 
-### Option 2 — Manual
+---
+
+### Option 3 — Manual
+
 
 **Prerequisites:**
 - Python 3.10+ and Node.js 18+
@@ -175,7 +193,10 @@ AI-Research-Agent/
 │   │       └── api.ts               # Typed API client for all endpoints
 ├── data/                            # PDFs & extracted figures (gitignored)
 ├── docker-compose.yml               # Qdrant & Redis containers
-├── start.ps1                        # One-command startup script
+├── start_all.bat                    # One-click Windows launcher (backend + frontend)
+├── start_backend.bat                # Backend + Docker Qdrant startup script
+├── start_frontend.bat               # Frontend startup script
+├── start.ps1                        # PowerShell startup script
 ├── run_backend.py                   # Backend dev server launcher
 ├── NEXT_STEPS.md                    # Phase 3+ roadmap & implementation plans
 └── .env.example                     # Environment variable template
