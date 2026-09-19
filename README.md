@@ -39,7 +39,7 @@
 - **Reading Agent** — Qdrant vector RAG retrieval with page-level context
 - **Writing Agent** — synthesizes responses, comparisons, and literature reviews with inline citations
 - **Dual LLM Router** (`llm_factory.py`):
-  - **Interactive tasks** → Groq API (`llama-3.3-70b-versatile`) — ultra-fast, high-quality
+  - **Interactive tasks** → Groq API (`qwen/qwen3.8-27b` or `openai/gpt-oss-120b`) — ultra-fast, high-quality
   - **Bulk background extraction** → Local Ollama (`qwen2.5:7b`) — saves cloud quota
   - **Auto-failover** — catches 429 rate limits and timeouts, falls back to Ollama seamlessly
 
@@ -68,7 +68,7 @@
 | Agent Orchestrator | LangGraph (Planner → Search → Reading → Writing pipeline) |
 | Vector Database | Qdrant (persistent) with in-memory fallback |
 | Relational Database | SQLite via SQLAlchemy ORM |
-| LLM — Interactive | Groq API (`llama-3.3-70b-versatile`) |
+| LLM — Interactive | Groq API (`qwen/qwen3.8-27b`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`) |
 | LLM — Bulk/Local | Ollama (`qwen2.5:7b`) |
 | Vision Model | Ollama (`qwen2.5vl:3b`) for figure captioning |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |

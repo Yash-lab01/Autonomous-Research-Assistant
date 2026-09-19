@@ -10,7 +10,7 @@ logger = logging.getLogger("ai_research_os.llm_factory")
 class LLMFactory:
     """
     Workload-Aware LLM Provider Router.
-    - Interactive tasks -> Groq API (llama-3.3-70b-versatile) for high speed & reasoning.
+    - Interactive tasks -> Groq API (qwen/qwen3.8-27b or openai/gpt-oss-120b) for high speed & reasoning.
     - Bulk/Background tasks -> Local Ollama (qwen2.5:7b) to save cloud API quota.
     - Gracefully handles HTTP 429 rate limits, timeouts, and missing API keys by falling back to Ollama.
     """

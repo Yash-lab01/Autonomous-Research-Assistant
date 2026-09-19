@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # API Keys & Models
     GROQ_API_KEY: str = ""
-    GROQ_PRIMARY_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_PRIMARY_MODEL: str = "qwen/qwen3.8-27b"  # Supported: qwen/qwen3.8-27b, openai/gpt-oss-120b, openai/gpt-oss-20b
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_FALLBACK_MODEL: str = "qwen2.5:7b"
     OLLAMA_VISION_MODEL: str = "qwen2.5vl:3b"  # Local vision model for figure captioning

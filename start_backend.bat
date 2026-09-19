@@ -9,7 +9,7 @@ echo ===================================================
 echo.
 
 :: 1. Start Qdrant in Docker (if Docker is available)
-echo [1/4] Checking Qdrant Vector Database...
+echo [1/3] Checking Qdrant Vector Database...
 curl.exe -s --max-time 2 http://localhost:6333/healthz >nul 2>&1
 if %errorlevel% equ 0 (
     echo [OK] Qdrant is already running at http://localhost:6333
@@ -30,10 +30,10 @@ if %errorlevel% equ 0 (
 )
 echo.
 
-:: 2. Setup Virtual Environment
-echo [2/4] Checking Python Virtual Environment...
+:: 2. Setup & Activate Virtual Environment
+echo [2/3] Activating Python Virtual Environment...
 if not exist "venv\Scripts\activate.bat" (
-    echo Virtual environment not found. Creating 'venv'...
+    echo Virtual environment not found. Creating 'venv' and installing dependencies...
     python -m venv venv
     if errorlevel 1 (
         echo [ERROR] Failed to create virtual environment with Python.
@@ -41,19 +41,16 @@ if not exist "venv\Scripts\activate.bat" (
         pause
         exit /b 1
     )
-)
-
-:: 3. Activate venv & install dependencies
-echo [3/4] Activating venv and checking dependencies...
-call .\venv\Scripts\activate.bat
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo [WARN] Dependency installation had warnings/errors. Continuing to start backend...
+    call .\venv\Scripts\activate.bat
+    echo Installing dependencies (first-time setup)...
+    pip install -r requirements.txt
+) else (
+    call .\venv\Scripts\activate.bat
 )
 echo.
 
-:: 4. Launch Backend
-echo [4/4] Starting FastAPI backend on http://localhost:8000 ...
+:: 3. Launch Backend
+echo [3/3] Starting FastAPI backend on http://localhost:8000 ...
 python run_backend.py
 
 if errorlevel 1 (

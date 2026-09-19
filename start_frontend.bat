@@ -17,14 +17,17 @@ if not exist "frontend" (
 
 cd frontend
 
-echo [1/2] Installing frontend dependencies...
-call npm install
-if errorlevel 1 (
-    echo [WARN] npm install encountered warnings or issues. Proceeding...
+:: Only install dependencies if node_modules is missing
+if not exist "node_modules" (
+    echo Installing frontend dependencies (first-time setup)...
+    call npm install
+    if errorlevel 1 (
+        echo [WARN] npm install encountered warnings or issues. Proceeding...
+    )
+    echo.
 )
-echo.
 
-echo [2/2] Starting Next.js frontend dev server on http://localhost:3000 ...
+echo Starting Next.js frontend dev server on http://localhost:3000 ...
 call npm run dev
 
 if errorlevel 1 (
