@@ -28,28 +28,43 @@ class LLMFactory:
         """
         groq_api_key = settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
 
+        # Guard against 413 Payload Too Large by truncating excessively long prompts
+        safe_prompt = prompt
+        if len(safe_prompt) > 12000:
+            logger.warning(f"Prompt length ({len(safe_prompt)} chars) exceeds safe threshold for Groq TPM. Truncating context.")
+            safe_prompt = safe_prompt[:6000] + "\n\n...[Context truncated to fit token limits]...\n\n" + safe_prompt[-4000:]
+
         # Decide primary target based on workload type and key availability
         if workload_type == "interactive" and groq_api_key:
-            try:
-                logger.info(f"Routing interactive workload to Groq ({settings.GROQ_PRIMARY_MODEL})...")
-                return await LLMFactory._call_groq(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    api_key=groq_api_key,
-                    model=settings.GROQ_PRIMARY_MODEL,
-                    response_format=response_format,
-                    temperature=temperature
-                )
-            except Exception as e:
-                err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
-                logger.warning(f"Groq API call failed ({err_msg}). Falling back to local Ollama...")
-                # Fallthrough to Ollama
+            # Try primary model, then failover to other supported Groq models
+            groq_models = [settings.GROQ_PRIMARY_MODEL]
+            for alt in ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
+                if alt not in groq_models:
+                    groq_models.append(alt)
+
+            last_groq_error = None
+            for model_name in groq_models:
+                try:
+                    logger.info(f"Routing interactive workload to Groq ({model_name})...")
+                    return await LLMFactory._call_groq(
+                        prompt=safe_prompt,
+                        system_prompt=system_prompt,
+                        api_key=groq_api_key,
+                        model=model_name,
+                        response_format=response_format,
+                        temperature=temperature
+                    )
+                except Exception as e:
+                    last_groq_error = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+                    logger.warning(f"Groq ({model_name}) call failed ({last_groq_error}). Trying next option...")
+
+            logger.warning(f"All Groq models failed. Last error: {last_groq_error}. Falling back to local Ollama...")
 
         # Default or Fallback: Call local Ollama
         try:
             logger.info(f"Routing workload ({workload_type}) to local Ollama ({settings.OLLAMA_FALLBACK_MODEL})...")
             return await LLMFactory._call_ollama(
-                prompt=prompt,
+                prompt=safe_prompt,
                 system_prompt=system_prompt,
                 model=settings.OLLAMA_FALLBACK_MODEL,
                 response_format=response_format,
@@ -60,21 +75,21 @@ class LLMFactory:
             logger.error(f"Local Ollama call failed ({err_msg}).")
             # If Groq is available as secondary fallback for bulk, try it
             if workload_type == "bulk" and groq_api_key:
-                try:
-                    logger.info("Attempting secondary fallback to Groq...")
-                    return await LLMFactory._call_groq(
-                        prompt=prompt,
-                        system_prompt=system_prompt,
-                        api_key=groq_api_key,
-                        model=settings.GROQ_PRIMARY_MODEL,
-                        response_format=response_format,
-                        temperature=temperature
-                    )
-                except Exception as groq_err:
-                    g_msg = f"{type(groq_err).__name__}: {groq_err}" if str(groq_err) else type(groq_err).__name__
-                    raise RuntimeError(f"Both Ollama and Groq LLM calls failed: Ollama ({err_msg}), Groq ({g_msg})")
+                for alt_m in [settings.GROQ_PRIMARY_MODEL, "openai/gpt-oss-120b"]:
+                    try:
+                        logger.info(f"Attempting secondary fallback to Groq ({alt_m})...")
+                        return await LLMFactory._call_groq(
+                            prompt=safe_prompt,
+                            system_prompt=system_prompt,
+                            api_key=groq_api_key,
+                            model=alt_m,
+                            response_format=response_format,
+                            temperature=temperature
+                        )
+                    except Exception as groq_err:
+                        pass
             
-            raise RuntimeError(f"LLM execution failed: {err_msg}. Ensure Ollama is running at {settings.OLLAMA_BASE_URL} or supply a valid GROQ_API_KEY.")
+            raise RuntimeError(f"LLM execution failed: Ollama unreachable ({err_msg}). Please check that GROQ_API_KEY is valid or Ollama is running at {settings.OLLAMA_BASE_URL}.")
 
     @staticmethod
     async def _call_groq(

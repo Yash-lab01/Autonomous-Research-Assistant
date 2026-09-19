@@ -48,7 +48,8 @@ class WritingAgent:
 
         for idx, c in enumerate(chunks, start=1):
             tag = f"[Citation {idx}: Paper {c['paper_id']}, p.{c['page_number']}]"
-            context_blocks.append(f"{tag}\n\"{c['text']}\"")
+            snippet = (c.get('text') or "")[:750].strip()
+            context_blocks.append(f"{tag}\n\"{snippet}\"")
             citations_list.append({
                 "citation_id": idx,
                 "paper_id": c["paper_id"],
@@ -268,7 +269,12 @@ Write the full literature review draft now, following all formatting rules stric
             return "Paper not found."
 
         sd = paper.structured_data or {}
-        top_paragraphs = "\n\n".join([f"[p. {p.page_number}] {p.text}" for p in paragraphs[:10]])
+        compact_paras = []
+        for p in paragraphs[:6]:
+            t = (p.text or "").strip()
+            if t:
+                compact_paras.append(f"[p. {p.page_number}] {t[:750]}")
+        top_paragraphs = "\n\n".join(compact_paras) or "No detailed paragraphs available."
         fig_captions = "\n".join([f"- [Fig p.{f.page_number}] {f.caption}" for f in figures[:6]]) or "No figures extracted."
 
         PAPER_SUMMARY_PROMPT = f"""You are a senior AI research scientist. Write a deep, highly technical per-paper summary for the following research paper.
@@ -338,13 +344,15 @@ Write 3-5 concise bullet points summarizing why this paper matters and when to c
         paper_blocks = []
         for p in papers:
             sd = p.structured_data or {}
+            abstract = (p.summary or "N/A")[:450].strip()
+            method = (sd.get('methodology_summary') or abstract)[:350].strip()
             paper_blocks.append(
                 f"Title: {p.title}\n"
-                f"Abstract: {p.summary or 'N/A'}\n"
+                f"Abstract: {abstract}\n"
                 f"Task: {sd.get('primary_task', 'N/A')}\n"
-                f"Methodology: {sd.get('methodology_summary', 'N/A')}\n"
-                f"Datasets: {', '.join(sd.get('datasets_used', []))}\n"
-                f"Limitations: {'; '.join(sd.get('limitations', []))}"
+                f"Methodology: {method}\n"
+                f"Datasets: {', '.join(sd.get('datasets_used', [])[:4])}\n"
+                f"Limitations: {'; '.join(sd.get('limitations', [])[:3])}"
             )
 
         combined_input = "\n\n---\n\n".join(paper_blocks)
