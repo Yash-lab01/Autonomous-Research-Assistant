@@ -59,7 +59,7 @@ gantt
 ```
 
 ### 🎯 Milestone 1: Production Hierarchical Ingestion (Database Cards)
-- **Goal:** Implement **Solution 2** from [`05_groq_token_limits_and_solutions.md`](file:///docs/05_groq_token_limits_and_solutions.md).
+- **Goal:** Implement **Solution 2** from [`05_current_problems_and_solutions.md`](file:///docs/05_current_problems_and_solutions.md).
 - At PDF ingestion time, automatically generate structured JSON research cards (`executive_summary`, `core_methodology`, `key_findings`, `stated_limitations`, `datasets_used`).
 - Synthesis Studio tools will query these cards directly, reducing token consumption by 90% while retaining 100% of core factual metrics.
 
